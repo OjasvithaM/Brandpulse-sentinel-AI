@@ -1,0 +1,6 @@
+{
+  "name": "BrandPulse Sentinel AI",
+  "description": "Evidence-Based Brand Governance with Change-Impact Intelligence and Version-Specific Trust Passports",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
