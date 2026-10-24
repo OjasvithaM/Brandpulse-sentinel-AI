@@ -10,6 +10,7 @@ import {
   UserCheck,
   History,
   RotateCw,
+  Download,
 } from 'lucide-react';
 import { AuditLog } from '../types';
 
@@ -35,6 +36,29 @@ export const AuditHistoryView: React.FC<AuditHistoryViewProps> = ({
       log.target_id.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesEvent && matchesSearch;
   });
+
+  const exportToCSV = () => {
+    if (filteredLogs.length === 0) return;
+    const headers = ['Timestamp', 'Event Type', 'Actor', 'Role', 'Target Type', 'Target ID', 'Details'];
+    const rows = filteredLogs.map((log) => [
+      `"${log.created_at}"`,
+      `"${log.event_type}"`,
+      `"${log.actor.replace(/"/g, '""')}"`,
+      `"${log.actor_role.replace(/"/g, '""')}"`,
+      `"${log.target_type}"`,
+      `"${log.target_id}"`,
+      `"${log.details.replace(/"/g, '""')}"`,
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `brandpulse-audit-trail-${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const getEventBadge = (eventType: string) => {
     switch (eventType) {
@@ -68,13 +92,24 @@ export const AuditHistoryView: React.FC<AuditHistoryViewProps> = ({
             Chronological, immutable record of all approved fact evolutions, change impact detections, passport issuances, and human reviewer decisions.
           </p>
         </div>
-        <button
-          onClick={onRefresh}
-          className="p-2 rounded-md bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 transition-colors cursor-pointer self-start sm:self-auto"
-          title="Refresh log"
-        >
-          <RotateCw className="w-4 h-4" />
-        </button>
+        <div className="flex items-center space-x-2 self-start sm:self-auto">
+          <button
+            onClick={exportToCSV}
+            disabled={filteredLogs.length === 0}
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-md bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+            title="Download audit records in CSV format for compliance reporting"
+          >
+            <Download className="w-3.5 h-3.5 text-slate-500" />
+            <span>Export CSV</span>
+          </button>
+          <button
+            onClick={onRefresh}
+            className="p-1.5 rounded-md bg-white border border-slate-300 hover:bg-slate-50 text-slate-600 transition-colors cursor-pointer"
+            title="Refresh log"
+          >
+            <RotateCw className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Filter and Search Bar */}

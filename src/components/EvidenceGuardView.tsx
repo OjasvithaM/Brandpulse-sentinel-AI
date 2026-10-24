@@ -190,8 +190,24 @@ export const EvidenceGuardView: React.FC<EvidenceGuardViewProps> = ({
           </p>
         </div>
 
-        {/* Preset demonstration loaders */}
-        <div className="flex items-center space-x-2 text-xs">
+        {/* Preset demonstration loaders & Upload Document */}
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+            accept=".txt,.md,.json,.csv"
+            className="hidden"
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center px-2.5 py-1.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 font-medium cursor-pointer transition-colors"
+            title="Upload a text, markdown, or JSON document"
+          >
+            <Upload className="w-3.5 h-3.5 mr-1 text-slate-500" />
+            Upload Document
+          </button>
+          <span className="text-slate-400 hidden sm:inline">|</span>
           <span className="text-slate-500 hidden md:inline">Presets:</span>
           <button
             onClick={() => loadPreset('conflicting_brochure')}
@@ -254,10 +270,28 @@ export const EvidenceGuardView: React.FC<EvidenceGuardViewProps> = ({
         </div>
 
         <div>
-          <div className="flex items-center justify-between mb-1">
-            <label className="text-xs font-bold text-slate-700">
-              Marketing Copy / Text Document to Verify:
-            </label>
+          <div className="flex flex-wrap items-center justify-between gap-1 mb-1">
+            <div className="flex items-center space-x-2">
+              <label className="text-xs font-bold text-slate-700">
+                Marketing Copy / Text Document to Verify:
+              </label>
+              {uploadedFileName && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-200">
+                  <FileUp className="w-3 h-3 mr-1" />
+                  {uploadedFileName}
+                  <button
+                    onClick={() => {
+                      setUploadedFileName(null);
+                      setContent('');
+                    }}
+                    className="ml-1.5 text-indigo-400 hover:text-indigo-800 font-bold"
+                    title="Remove uploaded document"
+                  >
+                    ✕
+                  </button>
+                </span>
+              )}
+            </div>
             <span className="text-[11px] text-slate-400">
               {content.length} characters • {content.split(/\s+/).filter(Boolean).length} words
             </span>

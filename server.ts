@@ -861,10 +861,16 @@ app.post('/api/evaluate', async (req, res) => {
 // VITE DEV SERVER / PRODUCTION STATIC ASSET MOUNT
 // -------------------------------------------------------------
 async function startServer() {
-  if (process.env.NODE_ENV === 'production') {
-    app.use(express.static(path.resolve(process.cwd(), 'dist')));
+  const isProduction =
+    process.env.NODE_ENV === 'production' ||
+    process.env.K_SERVICE !== undefined ||
+    process.argv[1]?.includes('dist/server.js');
+
+  if (isProduction) {
+    const distPath = path.resolve(process.cwd(), 'dist');
+    app.use(express.static(distPath));
     app.get('*', (req, res) => {
-      res.sendFile(path.resolve(process.cwd(), 'dist', 'index.html'));
+      res.sendFile(path.resolve(distPath, 'index.html'));
     });
   } else {
     const { createServer: createViteServer } = await import('vite');
@@ -875,10 +881,11 @@ async function startServer() {
     app.use(vite.middlewares);
   }
 
-  const PORT = 3000;
+  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`BrandPulse Sentinel AI full-stack server running at http://localhost:${PORT}`);
+    console.log(`BrandPulse Sentinel AI server running on port ${PORT} [mode: ${isProduction ? 'production' : 'development'}]`);
   });
 }
 
 startServer();
+
