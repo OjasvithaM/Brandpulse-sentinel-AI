@@ -239,3 +239,90 @@ test('detectFactConflicts detects internal Knowledge Base contradictions', () =>
   assert.ok(conflicts[0].reason.includes('Direct metric contradiction'));
 });
 
+// -------------------------------------------------------------
+// LIVE CONNECTOR LOGIC TESTS (Idempotency, Freshness, & Diff Detection)
+// -------------------------------------------------------------
+import {
+  computePayloadHash,
+  calculateFreshness,
+  detectMaterialFactDifferences,
+  extractFactsFromPayload,
+} from '../../server/liveConnectors';
+
+test('computePayloadHash produces deterministic SHA-256 hashes', () => {
+  const payload1 = { price: '₹999/month', sla: '99.99%' };
+  const payload2 = { price: '₹999/month', sla: '99.99%' };
+  const payloadDiff = { price: '₹1,199/month', sla: '99.99%' };
+
+  const hash1 = computePayloadHash(payload1);
+  const hash2 = computePayloadHash(payload2);
+  const hash3 = computePayloadHash(payloadDiff);
+
+  assert.equal(hash1, hash2, 'Identical payloads must produce identical hashes');
+  assert.notEqual(hash1, hash3, 'Different payloads must produce different hashes');
+});
+
+test('calculateFreshness properly categorizes FRESH, STALE, and ERROR states', () => {
+  const now = new Date().toISOString();
+  const past3Hours = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString();
+
+  // 30 minute interval with recent sync -> FRESH
+  const fresh = calculateFreshness(now, 30, 'SUCCESS');
+  assert.equal(fresh, 'FRESH');
+
+  // 30 minute interval synced 3 hours ago -> STALE (exceeds 2x interval)
+  const stale = calculateFreshness(past3Hours, 30, 'SUCCESS');
+  assert.equal(stale, 'STALE');
+
+  // Failed sync -> ERROR
+  const errState = calculateFreshness(now, 30, 'ERROR');
+  assert.equal(errState, 'ERROR');
+
+  // Never synced -> UNKNOWN
+  const unk = calculateFreshness(null, 30, 'NEVER_SYNCED');
+  assert.equal(unk, 'UNKNOWN');
+});
+
+test('detectMaterialFactDifferences detects price differences and ignores identical facts', () => {
+  const liveFacts = [
+    {
+      key: 'acme_cloud_pro_price',
+      name: 'Acme Cloud Pro Monthly Subscription',
+      value: '₹1,199/month',
+      category: 'pricing',
+      source_ref: 'LIVE-API-001',
+    },
+    {
+      key: 'acme_uptime_sla',
+      name: 'Enterprise Cloud SLA Guarantee',
+      value: '99.99%',
+      category: 'sla',
+      source_ref: 'LIVE-API-001',
+    },
+  ];
+
+  const diffs = detectMaterialFactDifferences(liveFacts, mockFacts);
+
+  // Price changed (₹999 -> ₹1,199), SLA remained 99.99%
+  assert.equal(diffs.length, 1);
+  assert.equal(diffs[0].key, 'acme_cloud_pro_price');
+  assert.equal(diffs[0].currentApprovedValue, '₹999/month');
+  assert.equal(diffs[0].retrievedLiveValue, '₹1,199/month');
+});
+
+test('extractFactsFromPayload correctly extracts pricing and SLA fields', () => {
+  const rawPricingPayload = {
+    product: 'Acme Cloud Pro',
+    price: '₹999/month',
+    trial_days: '14 days',
+    datacenter_regions: 'Mumbai & Frankfurt Regions',
+  };
+
+  const extracted = extractFactsFromPayload('pricing_feed', rawPricingPayload, 'SRC-TEST-01');
+  assert.equal(extracted.length, 3);
+  assert.equal(extracted.find((f) => f.key === 'acme_cloud_pro_price')?.value, '₹999/month');
+  assert.equal(extracted.find((f) => f.key === 'acme_trial_period')?.value, '14 days');
+  assert.equal(extracted.find((f) => f.key === 'acme_data_residency')?.value, 'Mumbai & Frankfurt Regions');
+});
+
+

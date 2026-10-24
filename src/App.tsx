@@ -3,6 +3,8 @@ import { Header } from './components/Header';
 import { Navbar, NavTab } from './components/Navbar';
 import { DemoGuide } from './components/DemoGuide';
 import { DashboardView } from './components/DashboardView';
+import { NewAuditView } from './components/NewAuditView';
+import { SavedAuditsView } from './components/SavedAuditsView';
 import { KnowledgeBaseView } from './components/KnowledgeBaseView';
 import { EvidenceGuardView } from './components/EvidenceGuardView';
 import { BrandTimeMachineView } from './components/BrandTimeMachineView';
@@ -10,6 +12,7 @@ import { TrustPassportsView } from './components/TrustPassportsView';
 import { ReviewQueueView } from './components/ReviewQueueView';
 import { AuditHistoryView } from './components/AuditHistoryView';
 import { EvaluationSettingsView } from './components/EvaluationSettingsView';
+import { LiveSourcesView } from './components/LiveSourcesView';
 import {
   DashboardStats,
   Fact,
@@ -18,6 +21,7 @@ import {
   ChangeImpact,
   ReviewQueueItem,
   AuditLog,
+  SavedAudit,
 } from './types';
 
 export default function App() {
@@ -25,6 +29,7 @@ export default function App() {
   const [isDemoGuideOpen, setIsDemoGuideOpen] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [initialContentForEvidenceGuard, setInitialContentForEvidenceGuard] = useState('');
+  const [savedAuditsCount, setSavedAuditsCount] = useState(0);
 
   // Application data states
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -38,7 +43,7 @@ export default function App() {
   // Load all primary data
   const loadAllData = async () => {
     try {
-      const [statsRes, factsRes, rulesRes, passportsRes, impactsRes, reviewsRes, logsRes] =
+      const [statsRes, factsRes, rulesRes, passportsRes, impactsRes, reviewsRes, logsRes, auditsRes] =
         await Promise.all([
           fetch('/api/stats'),
           fetch('/api/facts'),
@@ -47,6 +52,7 @@ export default function App() {
           fetch('/api/impacts'),
           fetch('/api/reviews'),
           fetch('/api/audit-logs'),
+          fetch('/api/audits'),
         ]);
 
       if (statsRes.ok) setStats(await statsRes.json());
@@ -56,6 +62,10 @@ export default function App() {
       if (impactsRes.ok) setImpacts(await impactsRes.json());
       if (reviewsRes.ok) setReviewItems(await reviewsRes.json());
       if (logsRes.ok) setAuditLogs(await logsRes.json());
+      if (auditsRes.ok) {
+        const auditsData = await auditsRes.json();
+        if (Array.isArray(auditsData)) setSavedAuditsCount(auditsData.length);
+      }
     } catch (err) {
       console.error('Failed to load application data:', err);
     }
@@ -118,23 +128,27 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900">
-      {/* Top Header */}
+      {/* Redesigned Universal Header */}
       <Header
+        activeTab={activeTab}
+        onSelectTab={setActiveTab}
         hasGeminiKey={stats?.hasGeminiKey ?? false}
         onResetDemo={handleResetDemo}
         isResetting={isResetting}
-        onOpenDemoGuide={() => setIsDemoGuideOpen(true)}
+        savedAuditsCount={savedAuditsCount}
       />
 
-      {/* Navigation Bar */}
+      {/* Sub-Navigation Bar */}
       <Navbar
         activeTab={activeTab}
         onSelectTab={setActiveTab}
         pendingImpactsCount={stats?.pendingImpactsCount ?? 0}
         pendingReviewsCount={stats?.pendingReviewsCount ?? 0}
+        pendingStagedUpdatesCount={stats?.pendingStagedUpdatesCount ?? 0}
+        savedAuditsCount={savedAuditsCount}
       />
 
-      {/* Interactive Demo Script Modal */}
+      {/* Interactive Demonstration Modal */}
       <DemoGuide
         isOpen={isDemoGuideOpen}
         onClose={() => setIsDemoGuideOpen(false)}
@@ -153,6 +167,24 @@ export default function App() {
           />
         )}
 
+        {activeTab === 'new_audit' && (
+          <NewAuditView
+            approvedFacts={facts}
+            brandRules={rules}
+            onNavigateTab={setActiveTab}
+            onAuditCreated={(newAudit) => {
+              loadAllData();
+            }}
+          />
+        )}
+
+        {activeTab === 'saved_audits' && (
+          <SavedAuditsView
+            onNavigateTab={setActiveTab}
+            onRefreshStats={loadAllData}
+          />
+        )}
+
         {activeTab === 'knowledge_base' && (
           <KnowledgeBaseView
             facts={facts}
@@ -160,6 +192,13 @@ export default function App() {
             onFactUpdated={loadAllData}
             onFactCreated={loadAllData}
             onRuleCreated={loadAllData}
+          />
+        )}
+
+        {activeTab === 'live_sources' && (
+          <LiveSourcesView
+            onRefreshStats={loadAllData}
+            onNavigateTab={setActiveTab}
           />
         )}
 
@@ -212,11 +251,13 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
-        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span>
-            BrandPulse Sentinel AI • Evidence-Based Brand Governance Platform
-          </span>
+      <footer className="bg-white border-t border-slate-200 py-5 text-center text-xs text-slate-500">
+        <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center space-x-2">
+            <span className="font-bold text-slate-800">BrandPulse Sentinel AI</span>
+            <span>•</span>
+            <span>Evidence-Based Brand Governance Platform</span>
+          </div>
           <span className="font-mono text-[11px] text-slate-400">
             Verify every claim. Track every change. Preserve every decision.
           </span>

@@ -10,6 +10,14 @@ import {
   calculateGovernanceScore,
   ReviewedAssetSnapshot,
 } from './src/utils/governance';
+import {
+  getUpstreamPricingData,
+  getUpstreamSlaData,
+  setUpstreamPricingState,
+  setUpstreamSlaState,
+  syncLiveSource,
+  calculateFreshness,
+} from './server/liveConnectors';
 
 dotenv.config();
 
@@ -51,6 +59,9 @@ app.get('/api/stats', (req, res) => {
     const passportsCount = (db.prepare('SELECT COUNT(*) as c FROM trust_passports').get() as any).c;
     const pendingImpactsCount = (db.prepare("SELECT COUNT(*) as c FROM change_impacts WHERE alert_status = 'PENDING'").get() as any).c;
     const pendingReviewsCount = (db.prepare("SELECT COUNT(*) as c FROM assets WHERE status = 'pending_review' OR status = 'revalidation_required'").get() as any).c;
+    const liveSourcesCount = (db.prepare('SELECT COUNT(*) as c FROM live_sources WHERE is_active = 1').get() as any).c;
+    const liveStaleCount = (db.prepare("SELECT COUNT(*) as c FROM live_sources WHERE data_freshness = 'STALE' OR data_freshness = 'ERROR'").get() as any).c;
+    const pendingStagedUpdatesCount = (db.prepare("SELECT COUNT(*) as c FROM staged_fact_updates WHERE status = 'PENDING_APPROVAL'").get() as any).c;
 
     const recentAudits = db.prepare(`
       SELECT a.id, a.asset_id, a.asset_version, a.overall_status, a.governance_score, a.created_at, ass.name as asset_name
@@ -73,6 +84,9 @@ app.get('/api/stats', (req, res) => {
       passportsCount,
       pendingImpactsCount,
       pendingReviewsCount,
+      liveSourcesCount,
+      liveStaleCount,
+      pendingStagedUpdatesCount,
       recentAudits,
       recentFactChanges,
       hasGeminiKey: Boolean(process.env.GEMINI_API_KEY),
@@ -373,8 +387,8 @@ app.post('/api/verify', async (req, res) => {
       return res.status(400).json({ error: 'Content is required for verification.' });
     }
 
-    const approvedFacts = db.prepare('SELECT * FROM facts WHERE is_current = 1').all() as Fact[];
-    const brandRules = db.prepare("SELECT * FROM brand_rules WHERE status = 'active'").all() as BrandRule[];
+    const approvedFacts = db.prepare('SELECT * FROM facts WHERE is_current = 1').all() as unknown as Fact[];
+    const brandRules = db.prepare("SELECT * FROM brand_rules WHERE status = 'active'").all() as unknown as BrandRule[];
 
     const { findings, engineUsed, processingTimeMs } = await runEvidenceGuardVerification(
       content,
@@ -596,6 +610,416 @@ app.get('/api/passports/:id', (req, res) => {
 });
 
 // -------------------------------------------------------------
+// 4B. DEDICATED AUDIT LIFECYCLE & REVIEW API (New Audit & Review Audit)
+// -------------------------------------------------------------
+app.get('/api/audits', (req, res) => {
+  try {
+    const { search, brand, status, review_state } = req.query;
+    let query = `
+      SELECT
+        ar.id,
+        COALESCE(ar.brand, a.brand, 'Acme Technologies') as brand,
+        COALESCE(a.name, 'Untitled Audit') as audit_name,
+        COALESCE(a.channel, 'Website') as channel,
+        ar.asset_id,
+        ar.asset_version,
+        ar.overall_status,
+        ar.governance_score,
+        ar.claims_count,
+        ar.supported_count,
+        ar.contradicted_count,
+        ar.unverified_count,
+        ar.findings_json,
+        ar.engine_used,
+        COALESCE(ar.review_status, tp.human_decision, 'PENDING_REVIEW') as review_status,
+        COALESCE(ar.reviewer_name, tp.reviewer_name) as reviewer_name,
+        COALESCE(ar.reviewer_role, tp.reviewer_role) as reviewer_role,
+        COALESCE(ar.reviewer_notes, tp.decision_rationale) as reviewer_notes,
+        COALESCE(ar.reviewed_at, tp.decision_timestamp) as reviewed_at,
+        tp.passport_code,
+        av.content,
+        ar.created_at,
+        COALESCE(ar.reviewed_at, ar.created_at) as updated_at
+      FROM audit_runs ar
+      LEFT JOIN assets a ON ar.asset_id = a.id
+      LEFT JOIN asset_versions av ON ar.asset_id = av.asset_id AND ar.asset_version = av.version
+      LEFT JOIN trust_passports tp ON ar.id = tp.audit_run_id
+      WHERE 1=1
+    `;
+    const params: any[] = [];
+
+    if (status && status !== 'all' && status !== 'ALL') {
+      query += ' AND ar.overall_status = ?';
+      params.push(status);
+    }
+    if (brand && brand !== 'all' && brand !== 'ALL') {
+      query += ' AND (ar.brand = ? OR a.brand = ?)';
+      params.push(brand, brand);
+    }
+    if (review_state && review_state !== 'all' && review_state !== 'ALL') {
+      query += ' AND (ar.review_status = ? OR tp.human_decision = ?)';
+      params.push(review_state, review_state);
+    }
+    if (search) {
+      query += ' AND (a.name LIKE ? OR ar.id LIKE ? OR av.content LIKE ? OR ar.brand LIKE ?)';
+      const s = `%${search}%`;
+      params.push(s, s, s, s);
+    }
+
+    query += ' ORDER BY ar.created_at DESC';
+
+    const rows = db.prepare(query).all(...params) as any[];
+    const audits = rows.map((r) => {
+      let findings: any[] = [];
+      try {
+        findings = JSON.parse(r.findings_json || '[]');
+      } catch {}
+
+      const evidenceSources = Array.from(
+        new Set(findings.map((f: any) => f.matched_fact?.source_ref).filter(Boolean))
+      );
+
+      return {
+        id: r.id,
+        audit_name: r.audit_name,
+        brand: r.brand,
+        channel: r.channel,
+        content: r.content || '',
+        asset_id: r.asset_id,
+        asset_version: r.asset_version,
+        overall_status: r.overall_status,
+        governance_score: r.governance_score,
+        claims_count: r.claims_count,
+        supported_count: r.supported_count,
+        contradicted_count: r.contradicted_count,
+        unverified_count: r.unverified_count,
+        findings,
+        evidence_sources: evidenceSources,
+        engine_used: r.engine_used,
+        review_status: r.review_status || 'PENDING_REVIEW',
+        reviewer_name: r.reviewer_name || null,
+        reviewer_role: r.reviewer_role || null,
+        reviewer_notes: r.reviewer_notes || null,
+        reviewed_at: r.reviewed_at || null,
+        passport_code: r.passport_code || null,
+        created_at: r.created_at,
+        updated_at: r.updated_at,
+      };
+    });
+
+    res.json(audits);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/audits/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    const audit = db.prepare(`
+      SELECT
+        ar.id,
+        COALESCE(ar.brand, a.brand, 'Acme Technologies') as brand,
+        COALESCE(a.name, 'Untitled Audit') as audit_name,
+        COALESCE(a.channel, 'Website') as channel,
+        ar.asset_id,
+        ar.asset_version,
+        ar.overall_status,
+        ar.governance_score,
+        ar.claims_count,
+        ar.supported_count,
+        ar.contradicted_count,
+        ar.unverified_count,
+        ar.findings_json,
+        ar.engine_used,
+        COALESCE(ar.review_status, tp.human_decision, 'PENDING_REVIEW') as review_status,
+        COALESCE(ar.reviewer_name, tp.reviewer_name) as reviewer_name,
+        COALESCE(ar.reviewer_role, tp.reviewer_role) as reviewer_role,
+        COALESCE(ar.reviewer_notes, tp.decision_rationale) as reviewer_notes,
+        COALESCE(ar.reviewed_at, tp.decision_timestamp) as reviewed_at,
+        tp.passport_code,
+        av.content,
+        ar.created_at,
+        COALESCE(ar.reviewed_at, ar.created_at) as updated_at
+      FROM audit_runs ar
+      LEFT JOIN assets a ON ar.asset_id = a.id
+      LEFT JOIN asset_versions av ON ar.asset_id = av.asset_id AND ar.asset_version = av.version
+      LEFT JOIN trust_passports tp ON ar.id = tp.audit_run_id
+      WHERE ar.id = ? OR tp.id = ? OR tp.passport_code = ?
+    `).get(id, id, id) as any;
+
+    if (!audit) {
+      return res.status(404).json({ error: 'Audit record not found.' });
+    }
+
+    let findings: any[] = [];
+    try {
+      findings = JSON.parse(audit.findings_json || '[]');
+    } catch {}
+
+    const evidenceSources = Array.from(
+      new Set(findings.map((f: any) => f.matched_fact?.source_ref).filter(Boolean))
+    );
+
+    res.json({
+      id: audit.id,
+      audit_name: audit.audit_name,
+      brand: audit.brand,
+      channel: audit.channel,
+      content: audit.content || '',
+      asset_id: audit.asset_id,
+      asset_version: audit.asset_version,
+      overall_status: audit.overall_status,
+      governance_score: audit.governance_score,
+      claims_count: audit.claims_count,
+      supported_count: audit.supported_count,
+      contradicted_count: audit.contradicted_count,
+      unverified_count: audit.unverified_count,
+      findings,
+      evidence_sources: evidenceSources,
+      engine_used: audit.engine_used,
+      review_status: audit.review_status || 'PENDING_REVIEW',
+      reviewer_name: audit.reviewer_name || null,
+      reviewer_role: audit.reviewer_role || null,
+      reviewer_notes: audit.reviewer_notes || null,
+      reviewed_at: audit.reviewed_at || null,
+      passport_code: audit.passport_code || null,
+      created_at: audit.created_at,
+      updated_at: audit.updated_at,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/audits', async (req, res) => {
+  try {
+    const {
+      audit_name,
+      brand,
+      channel,
+      content,
+      knowledge_base_category,
+      evidence_sources,
+      reviewer_name,
+      auto_passport,
+    } = req.body;
+
+    if (!audit_name || !audit_name.trim()) {
+      return res.status(400).json({ error: 'Audit name is required.' });
+    }
+    if (!content || !content.trim()) {
+      return res.status(400).json({ error: 'Claim content or marketing draft text is required.' });
+    }
+
+    const brandName = brand || 'Acme Technologies';
+    const channelName = channel || 'Website';
+    const now = new Date().toISOString();
+
+    // Query approved facts and rules
+    let factsQuery = 'SELECT * FROM facts WHERE is_current = 1';
+    const factsParams: any[] = [];
+    if (knowledge_base_category && knowledge_base_category !== 'all') {
+      factsQuery += ' AND category = ?';
+      factsParams.push(knowledge_base_category);
+    }
+    const approvedFacts = db.prepare(factsQuery).all(...factsParams) as unknown as Fact[];
+    const brandRules = db.prepare("SELECT * FROM brand_rules WHERE status = 'active'").all() as unknown as BrandRule[];
+
+    // Execute verification
+    const { findings, engineUsed, processingTimeMs } = await runEvidenceGuardVerification(
+      content,
+      approvedFacts,
+      brandRules
+    );
+
+    const governanceResult = calculateGovernanceScore(findings);
+    const supported = findings.filter((f) => f.status === 'SUPPORTED').length;
+    const contradicted = findings.filter((f) => f.status === 'CONTRADICTED').length;
+    const unverified = findings.filter((f) => f.status === 'UNVERIFIED').length;
+
+    // Create asset
+    const assetId = `asset-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    db.prepare(`
+      INSERT INTO assets (id, name, channel, current_version, status, brand, created_at, updated_at)
+      VALUES (?, ?, ?, 1, ?, ?, ?, ?)
+    `).run(
+      assetId,
+      audit_name.trim(),
+      channelName,
+      governanceResult.status === 'PASSED' ? 'verified' : 'pending_review',
+      brandName,
+      now,
+      now
+    );
+
+    // Save asset version
+    const versionId = `ver-${assetId}-v1`;
+    db.prepare(`
+      INSERT INTO asset_versions (id, asset_id, version, content, author, created_at)
+      VALUES (?, ?, 1, ?, ?, ?)
+    `).run(versionId, assetId, content, reviewer_name || 'Brand Compliance Auditor', now);
+
+    // Save audit run
+    const auditRunId = `audit-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const reviewStatus = governanceResult.status === 'PASSED' ? 'APPROVED' : 'PENDING_REVIEW';
+    const evidenceList = Array.isArray(evidence_sources) && evidence_sources.length > 0
+      ? evidence_sources
+      : Array.from(new Set(findings.map((f) => f.matched_fact?.source_ref).filter(Boolean)));
+
+    db.prepare(`
+      INSERT INTO audit_runs (
+        id, asset_id, asset_version, overall_status, governance_score,
+        claims_count, supported_count, contradicted_count, unverified_count,
+        findings_json, engine_used, brand, review_status, reviewer_name,
+        reviewer_notes, evidence_sources_json, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      auditRunId,
+      assetId,
+      1,
+      governanceResult.status,
+      governanceResult.score,
+      findings.length,
+      supported,
+      contradicted,
+      unverified,
+      JSON.stringify(findings),
+      engineUsed,
+      brandName,
+      reviewStatus,
+      reviewer_name || null,
+      governanceResult.status === 'PASSED' ? 'Automated pre-verification passed with 100% compliance.' : 'Pending human compliance sign-off.',
+      JSON.stringify(evidenceList),
+      now
+    );
+
+    let passportCode: string | null = null;
+    if (auto_passport !== false) {
+      const passportId = `pass-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+      passportCode = `BP-PASS-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+      db.prepare(`
+        INSERT INTO trust_passports (
+          id, passport_code, asset_id, asset_name, asset_version, audit_run_id,
+          overall_status, governance_score, claims_json, evidence_sources_json,
+          reviewer_name, reviewer_role, human_decision, decision_rationale,
+          decision_timestamp, is_latest, created_at
+        ) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+      `).run(
+        passportId,
+        passportCode,
+        assetId,
+        audit_name.trim(),
+        auditRunId,
+        governanceResult.status,
+        governanceResult.score,
+        JSON.stringify(findings),
+        JSON.stringify(evidenceList),
+        reviewer_name || 'System Auditor',
+        'Compliance Reviewer',
+        reviewStatus,
+        governanceResult.status === 'PASSED' ? 'Automatic baseline verification passed.' : 'Initial audit completed; awaiting reviewer sign-off.',
+        now,
+        now
+      );
+    }
+
+    logAuditEvent(
+      'AUDIT_EXECUTED',
+      reviewer_name || 'Auditor',
+      'Compliance Specialist',
+      'AUDIT_RUN',
+      auditRunId,
+      `Executed brand audit "${audit_name}" for brand "${brandName}": ${supported} supported, ${contradicted} contradicted, ${unverified} unverified. Score: ${governanceResult.score}%`
+    );
+
+    const savedAudit = {
+      id: auditRunId,
+      audit_name: audit_name.trim(),
+      brand: brandName,
+      channel: channelName,
+      content,
+      asset_id: assetId,
+      asset_version: 1,
+      overall_status: governanceResult.status,
+      governance_score: governanceResult.score,
+      claims_count: findings.length,
+      supported_count: supported,
+      contradicted_count: contradicted,
+      unverified_count: unverified,
+      findings,
+      evidence_sources: evidenceList,
+      engine_used: engineUsed,
+      review_status: reviewStatus,
+      reviewer_name: reviewer_name || null,
+      reviewer_role: 'Compliance Reviewer',
+      reviewer_notes: governanceResult.status === 'PASSED' ? 'Automated pre-verification passed.' : 'Pending human compliance sign-off.',
+      reviewed_at: governanceResult.status === 'PASSED' ? now : null,
+      passport_code: passportCode,
+      created_at: now,
+      updated_at: now,
+    };
+
+    res.status(201).json(savedAudit);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/audits/:id/decision', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { decision, reviewer_name, reviewer_role, reviewer_notes } = req.body;
+
+    if (!decision || !['APPROVED', 'CHANGES_REQUESTED', 'REJECTED'].includes(decision)) {
+      return res.status(400).json({ error: 'Valid decision (APPROVED, CHANGES_REQUESTED, REJECTED) is required.' });
+    }
+
+    const auditRun = db.prepare('SELECT * FROM audit_runs WHERE id = ?').get(id) as any;
+    if (!auditRun) {
+      return res.status(404).json({ error: 'Audit run not found.' });
+    }
+
+    const now = new Date().toISOString();
+    const reviewer = reviewer_name || 'Brand Reviewer';
+    const role = reviewer_role || 'Governance Lead';
+    const notes = reviewer_notes || `Review decision recorded: ${decision}`;
+
+    // Update audit run
+    db.prepare(`
+      UPDATE audit_runs
+      SET review_status = ?, reviewer_name = ?, reviewer_role = ?, reviewer_notes = ?, reviewed_at = ?
+      WHERE id = ?
+    `).run(decision, reviewer, role, notes, now, id);
+
+    // Update associated trust passport
+    db.prepare(`
+      UPDATE trust_passports
+      SET human_decision = ?, reviewer_name = ?, reviewer_role = ?, decision_rationale = ?, decision_timestamp = ?
+      WHERE audit_run_id = ?
+    `).run(decision, reviewer, role, notes, now, id);
+
+    // Update asset status
+    const assetStatus = decision === 'APPROVED' ? 'verified' : decision === 'REJECTED' ? 'rejected' : 'pending_review';
+    db.prepare('UPDATE assets SET status = ?, updated_at = ? WHERE id = ?').run(assetStatus, now, auditRun.asset_id);
+
+    logAuditEvent(
+      'AUDIT_DECISION_RECORDED',
+      reviewer,
+      role,
+      'AUDIT_RUN',
+      id,
+      `Recorded review decision "${decision}" for audit ${id}. Rationale: "${notes}"`
+    );
+
+    res.json({ success: true, message: `Decision "${decision}" saved successfully.`, updated_at: now });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// -------------------------------------------------------------
 // 5. BRAND TIME MACHINE: REVALIDATION QUEUE & CHANGE IMPACTS
 // -------------------------------------------------------------
 app.get('/api/impacts', (req, res) => {
@@ -766,7 +1190,324 @@ app.get('/api/audit-logs', (req, res) => {
 });
 
 // -------------------------------------------------------------
-// 8. DEMO RESET & EVALUATION TEST SUITE (Section 11 & 12)
+// 8. LIVE DATA CONNECTORS & STAGED FACT GOVERNANCE
+// -------------------------------------------------------------
+// Upstream Live Feeds (Simulated Provider Endpoints)
+app.get('/api/live-demo/pricing', (req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=60');
+  res.json(getUpstreamPricingData());
+});
+
+app.get('/api/live-demo/sla', (req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=30');
+  res.json(getUpstreamSlaData());
+});
+
+app.post('/api/live-demo/simulate-upstream-change', (req, res) => {
+  const { newPrice, newSla } = req.body;
+  if (newPrice) setUpstreamPricingState(newPrice);
+  if (newSla) setUpstreamSlaState(newSla);
+  res.json({
+    success: true,
+    pricing: getUpstreamPricingData(),
+    sla: getUpstreamSlaData(),
+  });
+});
+
+// List configured live sources
+app.get('/api/live-sources', (req, res) => {
+  try {
+    const sources = db.prepare('SELECT * FROM live_sources ORDER BY created_at ASC').all() as any[];
+    const enriched = sources.map((s) => ({
+      ...s,
+      data_freshness: calculateFreshness(s.last_sync_at, s.sync_interval_mins, s.last_sync_status),
+    }));
+    res.json(enriched);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Add custom live connector
+app.post('/api/live-sources', (req, res) => {
+  try {
+    const { name, source_type, endpoint_url, auth_type, auth_header_name, auth_token_env_var, sync_interval_mins } = req.body;
+    if (!name || !endpoint_url) {
+      return res.status(400).json({ error: 'Name and endpoint URL are required.' });
+    }
+    const id = `src-custom-${Date.now()}`;
+    const now = new Date().toISOString();
+    db.prepare(`
+      INSERT INTO live_sources (
+        id, name, source_type, endpoint_url, auth_type, auth_header_name,
+        auth_token_env_var, sync_interval_mins, last_sync_status, data_freshness,
+        is_active, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'NEVER_SYNCED', 'UNKNOWN', 1, ?, ?)
+    `).run(
+      id,
+      name,
+      source_type || 'rest_api',
+      endpoint_url,
+      auth_type || 'none',
+      auth_header_name || null,
+      auth_token_env_var || null,
+      Number(sync_interval_mins) || 60,
+      now,
+      now
+    );
+
+    logAuditEvent(
+      'LIVE_CONNECTOR_CONFIGURED',
+      'Integration Administrator',
+      'Admin',
+      'LIVE_SOURCE',
+      id,
+      `Configured new live data connector: ${name} (${endpoint_url})`
+    );
+
+    res.status(201).json({ id, message: 'Live data connector created successfully.' });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Delete live connector
+app.delete('/api/live-sources/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    db.prepare('DELETE FROM live_sources WHERE id = ?').run(id);
+    logAuditEvent(
+      'LIVE_CONNECTOR_REMOVED',
+      'Integration Administrator',
+      'Admin',
+      'LIVE_SOURCE',
+      id,
+      `Removed live data connector ${id}`
+    );
+    res.json({ success: true });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Sync single live source
+app.post('/api/live-sources/:id/sync', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const appUrl = `${req.protocol}://${req.get('host')}`;
+    const result = await syncLiveSource(id, appUrl);
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Sync all active live sources
+app.post('/api/live-sources/sync-all', async (req, res) => {
+  try {
+    const sources = db.prepare('SELECT id FROM live_sources WHERE is_active = 1').all() as any[];
+    const appUrl = `${req.protocol}://${req.get('host')}`;
+    const results = [];
+    for (const s of sources) {
+      const r = await syncLiveSource(s.id, appUrl);
+      results.push({ sourceId: s.id, ...r });
+    }
+    res.json({ results });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// List staged fact updates awaiting human governance review
+app.get('/api/live-sources/staged-updates', (req, res) => {
+  try {
+    const updates = db.prepare(`
+      SELECT * FROM staged_fact_updates
+      ORDER BY detected_at DESC
+    `).all();
+    res.json(updates);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Decide (Approve / Reject) staged fact update
+app.post('/api/live-sources/staged-updates/:id/decide', (req, res) => {
+  try {
+    const { id } = req.params;
+    const { action, rationale, reviewer_name } = req.body;
+    if (!rationale) {
+      return res.status(400).json({ error: 'Reviewer rationale is mandatory when deciding on live fact updates.' });
+    }
+
+    const staged = db.prepare('SELECT * FROM staged_fact_updates WHERE id = ?').get(id) as any;
+    if (!staged) {
+      return res.status(404).json({ error: 'Staged fact update record not found.' });
+    }
+
+    const now = new Date().toISOString();
+    const reviewer = reviewer_name || 'Sarah Jenkins (Brand Compliance Lead)';
+
+    if (action === 'APPROVE') {
+      const currentFact = db.prepare('SELECT * FROM facts WHERE key = ? AND is_current = 1').get(staged.fact_key) as unknown as Fact;
+      if (!currentFact) {
+        return res.status(404).json({ error: `Fact with key ${staged.fact_key} not found in Knowledge Base.` });
+      }
+
+      const oldVersion = currentFact.version;
+      const newVersion = oldVersion + 1;
+      const oldValue = currentFact.value;
+      const newValue = staged.retrieved_live_value;
+
+      // 1. Archive in fact_history
+      const historyId = `fh-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+      db.prepare(`
+        INSERT INTO fact_history (id, fact_id, version, value, description, source_ref, status, changed_by, change_reason, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        historyId,
+        currentFact.id,
+        oldVersion,
+        oldValue,
+        currentFact.description,
+        currentFact.source_ref,
+        'superseded',
+        reviewer,
+        `Approved live feed update from ${staged.source_name}: ${rationale}`,
+        now
+      );
+
+      // 2. Update facts table
+      db.prepare(`
+        UPDATE facts
+        SET value = ?, version = ?, source_ref = ?, updated_at = ?
+        WHERE id = ?
+      `).run(newValue, newVersion, staged.source_ref, now, currentFact.id);
+
+      // 3. Brand Time Machine: detect retroactive change impacts
+      const allPassports = db.prepare(`
+        SELECT p.id as passport_id, p.asset_id, p.asset_name, p.asset_version, p.claims_json, av.content
+        FROM trust_passports p
+        JOIN asset_versions av ON p.asset_id = av.asset_id AND p.asset_version = av.version
+        WHERE p.is_latest = 1
+      `).all() as any[];
+
+      const monitoredAssets: ReviewedAssetSnapshot[] = allPassports.map((p) => {
+        let claims = [];
+        try {
+          claims = JSON.parse(p.claims_json);
+        } catch {}
+        return {
+          asset_id: p.asset_id,
+          asset_name: p.asset_name,
+          version: p.asset_version,
+          content: p.content,
+          passport_id: p.passport_id,
+          verified_claims: claims.map((c: any) => ({
+            claim_text: c.claim_text,
+            matched_fact_id: c.matched_fact?.id || null,
+            matched_fact_version: c.matched_fact?.version || null,
+            approved_value_used: c.matched_fact?.approved_value || null,
+          })),
+        };
+      });
+
+      const impacts = detectChangeImpact(
+        currentFact.id,
+        currentFact.name,
+        oldVersion,
+        newVersion,
+        oldValue,
+        newValue,
+        monitoredAssets
+      );
+
+      const insertImpact = db.prepare(`
+        INSERT INTO change_impacts (
+          id, fact_id, fact_name, old_version, new_version, old_value, new_value,
+          asset_id, asset_name, asset_version, impacted_claim_text, impact_reason,
+          impact_risk, alert_status, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDING', ?)
+      `);
+
+      for (const imp of impacts) {
+        const impactId = `imp-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+        insertImpact.run(
+          impactId,
+          imp.fact_id,
+          imp.fact_name,
+          imp.old_version,
+          imp.new_version,
+          imp.old_value,
+          imp.new_value,
+          imp.asset_id,
+          imp.asset_name,
+          imp.asset_version,
+          imp.impacted_claim_text,
+          imp.impact_reason,
+          imp.impact_risk,
+          now
+        );
+
+        db.prepare(`
+          UPDATE assets
+          SET status = 'revalidation_required', updated_at = ?
+          WHERE id = ?
+        `).run(now, imp.asset_id);
+      }
+
+      // 4. Mark staged update as APPROVED
+      db.prepare(`
+        UPDATE staged_fact_updates
+        SET status = 'APPROVED', reviewer_name = ?, reviewer_decision_at = ?,
+            decision_rationale = ?, impact_alerts_generated = ?
+        WHERE id = ?
+      `).run(reviewer, now, rationale, impacts.length, id);
+
+      logAuditEvent(
+        'LIVE_FACT_APPROVED_BY_HUMAN',
+        reviewer,
+        'Brand Compliance Lead',
+        'FACT',
+        currentFact.id,
+        `Approved live update for "${currentFact.name}" (${oldValue} -> ${newValue}). Generated ${impacts.length} change-impact alert(s). Rationale: ${rationale}`
+      );
+
+      res.json({
+        success: true,
+        action: 'APPROVED',
+        fact_id: currentFact.id,
+        old_value: oldValue,
+        new_value: newValue,
+        impacts_generated: impacts.length,
+      });
+    } else {
+      // REJECT
+      db.prepare(`
+        UPDATE staged_fact_updates
+        SET status = 'REJECTED', reviewer_name = ?, reviewer_decision_at = ?,
+            decision_rationale = ?
+        WHERE id = ?
+      `).run(reviewer, now, rationale, id);
+
+      logAuditEvent(
+        'LIVE_FACT_REJECTED_BY_HUMAN',
+        reviewer,
+        'Brand Compliance Lead',
+        'STAGED_FACT',
+        id,
+        `Rejected live update for "${staged.fact_name}". Rationale: ${rationale}`
+      );
+
+      res.json({ success: true, action: 'REJECTED' });
+    }
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// -------------------------------------------------------------
+// 9. DEMO RESET & EVALUATION TEST SUITE (Section 11 & 12)
 // -------------------------------------------------------------
 app.post('/api/demo/reset', (req, res) => {
   try {
@@ -779,8 +1520,8 @@ app.post('/api/demo/reset', (req, res) => {
 
 app.post('/api/evaluate', async (req, res) => {
   try {
-    const approvedFacts = db.prepare('SELECT * FROM facts WHERE is_current = 1').all() as Fact[];
-    const brandRules = db.prepare("SELECT * FROM brand_rules WHERE status = 'active'").all() as BrandRule[];
+    const approvedFacts = db.prepare('SELECT * FROM facts WHERE is_current = 1').all() as unknown as Fact[];
+    const brandRules = db.prepare("SELECT * FROM brand_rules WHERE status = 'active'").all() as unknown as BrandRule[];
 
     // Standardized labeled benchmark test suite
     const testCases = [

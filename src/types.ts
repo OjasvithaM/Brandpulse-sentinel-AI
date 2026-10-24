@@ -132,6 +132,60 @@ export interface AuditLog {
   created_at: string;
 }
 
+export interface LiveSource {
+  id: string;
+  name: string;
+  source_type: 'rest_api' | 'pricing_feed' | 'sla_telemetry' | 'policy_document';
+  endpoint_url: string;
+  auth_type: 'none' | 'bearer_token' | 'api_key_header';
+  auth_header_name?: string;
+  auth_token_env_var?: string;
+  sync_interval_mins: number;
+  last_sync_at?: string | null;
+  last_sync_status: 'SUCCESS' | 'ERROR' | 'SYNCING' | 'NEVER_SYNCED';
+  last_http_code?: number | null;
+  last_error?: string | null;
+  last_latency_ms?: number | null;
+  data_freshness: 'FRESH' | 'STALE' | 'ERROR' | 'UNKNOWN';
+  payload_hash?: string | null;
+  extracted_facts_json?: string | null;
+  is_active: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LiveSourceSyncRun {
+  id: string;
+  source_id: string;
+  sync_status: 'SUCCESS' | 'ERROR' | 'TIMEOUT';
+  http_status_code?: number;
+  response_time_ms: number;
+  payload_hash?: string;
+  facts_extracted_count: number;
+  facts_changed_count: number;
+  error_message?: string | null;
+  synced_at: string;
+}
+
+export interface StagedFactUpdate {
+  id: string;
+  source_id: string;
+  source_name: string;
+  source_ref: string;
+  fact_key: string;
+  fact_name: string;
+  category: string;
+  current_approved_value: string;
+  current_approved_version: number;
+  retrieved_live_value: string;
+  detected_at: string;
+  status: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
+  reviewer_name?: string | null;
+  reviewer_decision_at?: string | null;
+  decision_rationale?: string | null;
+  impact_alerts_generated: number;
+}
+
 export interface DashboardStats {
   factsCount: number;
   rulesCount: number;
@@ -139,7 +193,50 @@ export interface DashboardStats {
   passportsCount: number;
   pendingImpactsCount: number;
   pendingReviewsCount: number;
+  liveSourcesCount: number;
+  liveStaleCount: number;
+  pendingStagedUpdatesCount: number;
   recentAudits: any[];
   recentFactChanges: any[];
   hasGeminiKey: boolean;
 }
+
+export interface SavedAudit {
+  id: string;
+  audit_name: string;
+  brand: string;
+  channel: string;
+  content: string;
+  asset_id: string;
+  asset_version: number;
+  overall_status: 'PASSED' | 'CONDITIONAL' | 'FAILED';
+  governance_score: number;
+  claims_count: number;
+  supported_count: number;
+  contradicted_count: number;
+  unverified_count: number;
+  findings: VerificationFinding[];
+  evidence_sources: string[];
+  engine_used: string;
+  review_status: 'APPROVED' | 'PENDING_REVIEW' | 'CHANGES_REQUESTED' | 'REJECTED';
+  reviewer_name?: string | null;
+  reviewer_role?: string | null;
+  reviewer_notes?: string | null;
+  reviewed_at?: string | null;
+  passport_code?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NewAuditPayload {
+  audit_name: string;
+  brand: string;
+  channel: string;
+  content: string;
+  knowledge_base_category?: string;
+  evidence_sources?: string[];
+  reviewer_name?: string;
+  auto_passport?: boolean;
+}
+
+

@@ -147,13 +147,158 @@ export function initDb() {
       details TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS live_sources (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      source_type TEXT NOT NULL,
+      endpoint_url TEXT NOT NULL,
+      auth_type TEXT NOT NULL DEFAULT 'none',
+      auth_header_name TEXT,
+      auth_token_env_var TEXT,
+      sync_interval_mins INTEGER NOT NULL DEFAULT 60,
+      last_sync_at TEXT,
+      last_sync_status TEXT NOT NULL DEFAULT 'NEVER_SYNCED',
+      last_http_code INTEGER,
+      last_error TEXT,
+      last_latency_ms INTEGER,
+      data_freshness TEXT NOT NULL DEFAULT 'UNKNOWN',
+      payload_hash TEXT,
+      extracted_facts_json TEXT,
+      is_active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS live_source_sync_runs (
+      id TEXT PRIMARY KEY,
+      source_id TEXT NOT NULL,
+      sync_status TEXT NOT NULL,
+      http_status_code INTEGER,
+      response_time_ms INTEGER,
+      payload_hash TEXT,
+      facts_extracted_count INTEGER DEFAULT 0,
+      facts_changed_count INTEGER DEFAULT 0,
+      error_message TEXT,
+      synced_at TEXT NOT NULL,
+      FOREIGN KEY (source_id) REFERENCES live_sources(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS staged_fact_updates (
+      id TEXT PRIMARY KEY,
+      source_id TEXT NOT NULL,
+      source_name TEXT NOT NULL,
+      source_ref TEXT NOT NULL,
+      fact_key TEXT NOT NULL,
+      fact_name TEXT NOT NULL,
+      category TEXT NOT NULL,
+      current_approved_value TEXT NOT NULL,
+      current_approved_version INTEGER NOT NULL,
+      retrieved_live_value TEXT NOT NULL,
+      detected_at TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'PENDING_APPROVAL',
+      reviewer_name TEXT,
+      reviewer_decision_at TEXT,
+      decision_rationale TEXT,
+      impact_alerts_generated INTEGER DEFAULT 0,
+      FOREIGN KEY (source_id) REFERENCES live_sources(id) ON DELETE CASCADE
+    );
   `);
+
+  // Safe migrations for audit runs and assets
+  try { db.exec("ALTER TABLE audit_runs ADD COLUMN brand TEXT DEFAULT 'Acme Technologies'"); } catch {}
+  try { db.exec("ALTER TABLE audit_runs ADD COLUMN review_status TEXT DEFAULT 'PENDING_REVIEW'"); } catch {}
+  try { db.exec("ALTER TABLE audit_runs ADD COLUMN reviewer_name TEXT"); } catch {}
+  try { db.exec("ALTER TABLE audit_runs ADD COLUMN reviewer_role TEXT"); } catch {}
+  try { db.exec("ALTER TABLE audit_runs ADD COLUMN reviewer_notes TEXT"); } catch {}
+  try { db.exec("ALTER TABLE audit_runs ADD COLUMN reviewed_at TEXT"); } catch {}
+  try { db.exec("ALTER TABLE audit_runs ADD COLUMN evidence_sources_json TEXT"); } catch {}
+  try { db.exec("ALTER TABLE assets ADD COLUMN brand TEXT DEFAULT 'Acme Technologies'"); } catch {}
 
   // Check if initial demonstration facts exist
   const countRow = db.prepare('SELECT COUNT(*) as count FROM facts').get() as { count: number };
   if (countRow.count === 0) {
     seedDemoData();
+  } else {
+    const liveCount = db.prepare('SELECT COUNT(*) as count FROM live_sources').get() as { count: number };
+    if (liveCount.count === 0) {
+      seedLiveSources();
+    }
   }
+}
+
+export function seedLiveSources() {
+  const now = new Date().toISOString();
+  const insertLiveSource = db.prepare(`
+    INSERT INTO live_sources (
+      id, name, source_type, endpoint_url, auth_type, sync_interval_mins,
+      last_sync_at, last_sync_status, last_http_code, last_latency_ms,
+      data_freshness, payload_hash, extracted_facts_json, is_active, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+  `);
+
+  const initialPricingFacts = JSON.stringify([
+    {
+      key: 'acme_cloud_pro_price',
+      name: 'Acme Cloud Pro Monthly Subscription',
+      value: '₹999/month',
+      category: 'pricing',
+      source_ref: 'DOC-2026-LIVE-PRICING'
+    },
+    {
+      key: 'acme_trial_period',
+      name: 'Standard Evaluation Trial Period',
+      value: '14 days',
+      category: 'policy',
+      source_ref: 'DOC-2026-LIVE-TERMS'
+    }
+  ]);
+
+  insertLiveSource.run(
+    'src-acme-pricing',
+    'Acme Official Pricing & Packaging Feed (REST)',
+    'pricing_feed',
+    '/api/live-demo/pricing',
+    'none',
+    30,
+    now,
+    'SUCCESS',
+    200,
+    42,
+    'FRESH',
+    'hash-init-pricing-001',
+    initialPricingFacts,
+    now,
+    now
+  );
+
+  const initialSlaFacts = JSON.stringify([
+    {
+      key: 'acme_uptime_sla',
+      name: 'Enterprise Cloud SLA Guarantee',
+      value: '99.99%',
+      category: 'technical_sla',
+      source_ref: 'DOC-2026-LIVE-SLA'
+    }
+  ]);
+
+  insertLiveSource.run(
+    'src-acme-sla',
+    'Acme Infrastructure Telemetry & SLA Feed',
+    'sla_telemetry',
+    '/api/live-demo/sla',
+    'none',
+    15,
+    now,
+    'SUCCESS',
+    200,
+    18,
+    'FRESH',
+    'hash-init-sla-001',
+    initialSlaFacts,
+    now,
+    now
+  );
 }
 
 export function seedDemoData() {
@@ -240,11 +385,11 @@ export function seedDemoData() {
       id: 'fact-acme-copilot',
       key: 'acme_sentinel_model',
       name: 'BrandPulse AI Verification Engine',
-      value: 'Gemini 3.8 Flash Hybrid Engine',
+      value: 'Multi-Tier Semantic & Deterministic Engine',
       description: 'Semantic claim verification engine with deterministic fallback and confidence bounds.',
       category: 'feature',
       source_ref: 'DOC-2026-ENG-ARCH',
-      source_doc: 'BrandPulse Sentinel AI Technical Specification v3.8',
+      source_doc: 'BrandPulse Sentinel AI Technical Specification v3.0',
       status: 'approved',
       version: 1,
       effective_date: '2026-01-01',
@@ -408,7 +553,7 @@ export function seedDemoData() {
     0,
     0,
     JSON.stringify(findings1),
-    'Hybrid (Deterministic + Gemini 3.8 Flash)',
+    'Multi-Tier Engine (Deterministic + Semantic AI)',
     now
   );
 
@@ -464,11 +609,97 @@ export function seedDemoData() {
     'Trust Passport issued for Acme Q4 Product Launch Brochure v1. 3/3 claims verified.',
     now
   );
+
+  // 5. Seed Initial Authorized Live Data Sources
+  const insertLiveSource = db.prepare(`
+    INSERT INTO live_sources (
+      id, name, source_type, endpoint_url, auth_type, sync_interval_mins,
+      last_sync_at, last_sync_status, last_http_code, last_latency_ms,
+      data_freshness, payload_hash, extracted_facts_json, is_active, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+  `);
+
+  const initialPricingFacts = JSON.stringify([
+    {
+      key: 'acme_cloud_pro_price',
+      name: 'Acme Cloud Pro Monthly Subscription',
+      value: '₹999/month',
+      category: 'pricing',
+      source_ref: 'DOC-2026-LIVE-PRICING'
+    },
+    {
+      key: 'acme_trial_period',
+      name: 'Standard Evaluation Trial Period',
+      value: '14 days',
+      category: 'policy',
+      source_ref: 'DOC-2026-LIVE-TERMS'
+    }
+  ]);
+
+  insertLiveSource.run(
+    'src-acme-pricing',
+    'Acme Official Pricing & Packaging Feed (REST)',
+    'pricing_feed',
+    '/api/live-demo/pricing',
+    'none',
+    30,
+    now,
+    'SUCCESS',
+    200,
+    42,
+    'FRESH',
+    'hash-init-pricing-001',
+    initialPricingFacts,
+    now,
+    now
+  );
+
+  const initialSlaFacts = JSON.stringify([
+    {
+      key: 'acme_uptime_sla',
+      name: 'Enterprise Cloud SLA Guarantee',
+      value: '99.99%',
+      category: 'technical_sla',
+      source_ref: 'DOC-2026-LIVE-SLA'
+    }
+  ]);
+
+  insertLiveSource.run(
+    'src-acme-sla',
+    'Acme Infrastructure Telemetry & SLA Feed',
+    'sla_telemetry',
+    '/api/live-demo/sla',
+    'none',
+    15,
+    now,
+    'SUCCESS',
+    200,
+    18,
+    'FRESH',
+    'hash-init-sla-001',
+    initialSlaFacts,
+    now,
+    now
+  );
+
+  insertAuditLog.run(
+    'log-init-003',
+    'LIVE_CONNECTOR_INITIALIZED',
+    'System Integration Service',
+    'System',
+    'LIVE_SOURCE',
+    'src-acme-pricing',
+    'Configured authorized live pricing feed with 30-min scheduled sync and hash validation.',
+    now
+  );
 }
 
 // Reset database back to clean demo state
 export function resetDbToDemo() {
   db.exec(`
+    DELETE FROM staged_fact_updates;
+    DELETE FROM live_source_sync_runs;
+    DELETE FROM live_sources;
     DELETE FROM audit_logs;
     DELETE FROM change_impacts;
     DELETE FROM trust_passports;

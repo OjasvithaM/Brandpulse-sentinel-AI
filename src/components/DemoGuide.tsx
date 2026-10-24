@@ -42,7 +42,7 @@ export const DemoGuide: React.FC<DemoGuideProps> = ({
             </div>
             <div>
               <h3 className="text-base font-bold text-white">
-                Live Hackathon Demonstration Walkthrough
+                Interactive Brand Governance Walkthrough
               </h3>
               <p className="text-xs text-slate-300">
                 Fictional Organization: Acme Technologies Pvt Ltd

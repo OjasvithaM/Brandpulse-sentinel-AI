@@ -171,16 +171,16 @@ export const EvaluationSettingsView: React.FC<EvaluationSettingsViewProps> = ({
 
           <div className="space-y-2">
             <div className="flex items-center justify-between p-2 rounded bg-slate-50 border border-slate-200">
-              <span className="text-slate-600">Model Engine:</span>
+              <span className="text-slate-600">Verification Engine:</span>
               <span className="font-mono font-bold text-slate-900">
-                {hasGeminiKey ? 'Gemini 3.8 Flash (Server-Side)' : 'Deterministic Matching Engine'}
+                {hasGeminiKey ? 'Semantic & Deterministic Hybrid Engine' : 'Deterministic Rule & Metric Engine'}
               </span>
             </div>
 
             <div className="flex items-center justify-between p-2 rounded bg-slate-50 border border-slate-200">
-              <span className="text-slate-600">API Key Configured:</span>
-              <span className={`font-bold ${hasGeminiKey ? 'text-emerald-600' : 'text-amber-600'}`}>
-                {hasGeminiKey ? 'Active via Environment Secret' : 'Not Detected (Fallback Active)'}
+              <span className="text-slate-600">Semantic Engine Config:</span>
+              <span className={`font-bold ${hasGeminiKey ? 'text-emerald-600' : 'text-slate-600'}`}>
+                {hasGeminiKey ? 'Active via Server Configuration' : 'Local Deterministic Active'}
               </span>
             </div>
 
