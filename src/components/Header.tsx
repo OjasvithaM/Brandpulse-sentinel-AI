@@ -11,8 +11,12 @@ import {
   X,
   Radio,
   FileCheck2,
+  Network,
+  UserCheck,
+  ChevronDown,
 } from 'lucide-react';
 import { NavTab } from './Navbar';
+import { UserRole } from '../types';
 
 interface HeaderProps {
   activeTab: NavTab;
@@ -21,6 +25,8 @@ interface HeaderProps {
   onResetDemo: () => void;
   isResetting: boolean;
   savedAuditsCount?: number;
+  userRole?: UserRole;
+  onSelectRole?: (role: UserRole) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -30,20 +36,36 @@ export const Header: React.FC<HeaderProps> = ({
   onResetDemo,
   isResetting,
   savedAuditsCount = 0,
+  userRole = 'ADMIN',
+  onSelectRole,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
 
   const mainNavLinks: { id: NavTab; label: string; icon: React.ComponentType<{ className?: string }>; badge?: number }[] = [
     { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
+    { id: 'impact_graph', label: 'Impact Graph', icon: Network },
     { id: 'new_audit', label: 'New Audit', icon: ClipboardCheck },
     { id: 'saved_audits', label: 'Review Audits', icon: Search, badge: savedAuditsCount > 0 ? savedAuditsCount : undefined },
     { id: 'knowledge_base', label: 'Knowledge Base', icon: Database },
     { id: 'review_queue', label: 'Audit Dashboard', icon: FileCheck2 },
   ];
 
+  const roles: { role: UserRole; title: string; desc: string }[] = [
+    { role: 'ADMIN', title: 'Chief Brand Officer', desc: 'Full administrative & cryptographic governance authority' },
+    { role: 'CURATOR', title: 'Knowledge Base Curator', desc: 'Authorized to propose & edit brand facts and rules' },
+    { role: 'REVIEWER', title: 'Senior Compliance Reviewer', desc: 'Authorized to sign off audits and stage approvals' },
+    { role: 'AUTHOR', title: 'Marketing Content Author', desc: 'Authoring mode for draft claims verification' },
+  ];
+
   const handleNavClick = (tab: NavTab) => {
     onSelectTab(tab);
     setMobileMenuOpen(false);
+  };
+
+  const handleRoleSelect = (role: UserRole) => {
+    onSelectRole?.(role);
+    setRoleDropdownOpen(false);
   };
 
   return (
@@ -106,24 +128,65 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Right Status Controls & Mobile Menu Toggle */}
           <div className="flex items-center space-x-2 sm:space-x-3">
+            {/* RBAC Session Role Switcher */}
+            <div className="relative">
+              <button
+                onClick={() => setRoleDropdownOpen(!roleDropdownOpen)}
+                className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700/90 text-cyan-300 border border-cyan-800/60 text-xs font-mono font-medium transition-colors cursor-pointer shadow-xs"
+                title="Active Governance Session Role"
+                aria-expanded={roleDropdownOpen}
+              >
+                <UserCheck className="w-3.5 h-3.5 text-cyan-400" />
+                <span className="font-semibold">{userRole}</span>
+                <ChevronDown className="w-3 h-3 text-slate-400" />
+              </button>
+
+              {roleDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-72 rounded-xl bg-[#0b1220] border border-cyan-800/80 shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 duration-100">
+                  <div className="px-2.5 py-1.5 border-b border-slate-800 text-[10px] font-mono uppercase tracking-wider text-slate-400">
+                    Switch Governance Persona (RBAC)
+                  </div>
+                  <div className="space-y-1 mt-1">
+                    {roles.map((r) => (
+                      <button
+                        key={r.role}
+                        onClick={() => handleRoleSelect(r.role)}
+                        className={`w-full text-left px-2.5 py-2 rounded-lg text-xs transition-colors flex flex-col cursor-pointer ${
+                          userRole === r.role
+                            ? 'bg-cyan-950 text-cyan-200 border border-cyan-800'
+                            : 'text-slate-300 hover:bg-slate-900 border border-transparent'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between font-bold">
+                          <span>{r.title}</span>
+                          <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-cyan-400">
+                            {r.role}
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-slate-400 font-sans mt-0.5">{r.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Multi-tier Engine Status Pill */}
             <div
-              className="hidden md:flex items-center space-x-1.5 px-2.5 py-1 rounded text-xs font-medium border bg-emerald-950/60 text-emerald-300 border-emerald-800/80"
+              className="hidden xl:flex items-center space-x-1.5 px-2.5 py-1 rounded text-xs font-medium border bg-emerald-950/60 text-emerald-300 border-emerald-800/80"
               title="Multi-tier verification engine operational: deterministic terminology, exact metric math, and semantic validation."
             >
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              <span className="hidden xl:inline">Verification Engine: Active</span>
-              <span className="xl:hidden">Engine Active</span>
+              <span>Engine Active</span>
             </div>
 
             {/* Live Data Ingestion Status */}
             <div
-              className="hidden sm:flex items-center space-x-1.5 px-2.5 py-1 rounded text-xs font-medium border bg-indigo-950/60 text-indigo-300 border-indigo-800/80"
+              className="hidden lg:flex items-center space-x-1.5 px-2.5 py-1 rounded text-xs font-medium border bg-indigo-950/60 text-indigo-300 border-indigo-800/80"
               title="Configured live data connectors monitoring authorized brand feeds."
             >
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              <span className="hidden xl:inline">Live Ingestion: Connected</span>
-              <span className="xl:hidden">Live Feeds</span>
+              <span>Live Ingestion</span>
             </div>
 
             {/* Reset Demo Data Button */}

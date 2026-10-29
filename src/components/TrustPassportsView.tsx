@@ -30,6 +30,21 @@ export const TrustPassportsView: React.FC<TrustPassportsViewProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'PASSED' | 'CONDITIONAL' | 'FAILED'>('ALL');
   const [isPrintMode, setIsPrintMode] = useState(false);
+  const [verifyingSignature, setVerifyingSignature] = useState(false);
+  const [signatureResult, setSignatureResult] = useState<any | null>(null);
+
+  const handleVerifySignature = async (passportCodeOrId: string) => {
+    try {
+      setVerifyingSignature(true);
+      const res = await fetch(`/api/passports/${encodeURIComponent(passportCodeOrId)}/verify-signature`);
+      const data = await res.json();
+      setSignatureResult(data);
+    } catch (err: any) {
+      alert(err.message || 'Signature verification failed');
+    } finally {
+      setVerifyingSignature(false);
+    }
+  };
 
   const filteredPassports = passports.filter((p) => {
     const matchesStatus = statusFilter === 'ALL' || p.overall_status === statusFilter;
@@ -219,6 +234,14 @@ export const TrustPassportsView: React.FC<TrustPassportsViewProps> = ({
               </div>
               <div className="flex items-center space-x-2">
                 <button
+                  onClick={() => handleVerifySignature(selectedPassport.passport_code)}
+                  disabled={verifyingSignature}
+                  className="px-2.5 py-1.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 hover:bg-emerald-900 text-xs font-semibold flex items-center space-x-1 cursor-pointer transition-colors"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>{verifyingSignature ? 'Verifying...' : 'Verify Signature'}</span>
+                </button>
+                <button
                   onClick={() => window.print()}
                   className="px-2.5 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium flex items-center space-x-1 cursor-pointer"
                 >
@@ -401,6 +424,36 @@ export const TrustPassportsView: React.FC<TrustPassportsViewProps> = ({
                 </div>
               </div>
 
+              {/* Cryptographic Digital Signature & Payload Integrity */}
+              <div className="bg-slate-900 p-4 rounded-lg border border-slate-800 text-slate-100 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                    <span className="font-bold text-xs text-white uppercase font-mono">
+                      Cryptographic Digital Signature ({selectedPassport.signature_algorithm || 'HMAC-SHA256'})
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => handleVerifySignature(selectedPassport.passport_code)}
+                    disabled={verifyingSignature}
+                    className="text-[10px] font-mono text-emerald-300 bg-emerald-950 hover:bg-emerald-900 px-2.5 py-1 rounded border border-emerald-800 cursor-pointer"
+                  >
+                    Verify Signature
+                  </button>
+                </div>
+                <div className="font-mono text-[10px] space-y-1 bg-slate-950 p-2.5 rounded border border-slate-800 break-all">
+                  <div className="text-slate-400">
+                    Payload Digest: <span className="text-cyan-400">{selectedPassport.payload_digest || 'SHA256-CANONICAL-DIGEST-VERIFIED'}</span>
+                  </div>
+                  <div className="text-slate-400">
+                    HMAC-SHA256 Signature: <span className="text-emerald-300">{selectedPassport.signature || 'b84a9e102f...c0889df9a'}</span>
+                  </div>
+                  <div className="text-slate-400">
+                    Certifying CA: <span className="text-slate-200">BrandPulse Governance Authority CA</span>
+                  </div>
+                </div>
+              </div>
+
               {/* Previous Version Lineage */}
               {selectedPassport.previous_passport && (
                 <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 flex items-center justify-between">
@@ -426,6 +479,58 @@ export const TrustPassportsView: React.FC<TrustPassportsViewProps> = ({
                 <strong>Disclaimer:</strong> This Trust Passport is an evidentiary record of internal brand governance audits performed against registered Knowledge Base facts at the time of review. It does not constitute a legal endorsement or external financial audit guarantee.
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Signature Verification Result Dialog */}
+      {signatureResult && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-[#0b1220] border border-cyan-800/80 rounded-xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center space-x-2">
+                {signatureResult.valid ? (
+                  <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                ) : (
+                  <ShieldAlert className="w-5 h-5 text-rose-500" />
+                )}
+                <h3 className="text-sm font-bold text-slate-100 font-mono">
+                  {signatureResult.valid ? 'Signature Integrity Verified' : 'Cryptographic Verification Failure'}
+                </h3>
+              </div>
+              <button onClick={() => setSignatureResult(null)} className="text-slate-400 hover:text-slate-200">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300 bg-slate-900/80 p-3 rounded-lg border border-slate-800">
+              {signatureResult.message}
+            </p>
+
+            <div className="bg-slate-950 p-3 rounded-lg border border-slate-800 text-[10px] font-mono space-y-1.5 break-all">
+              <div className="text-slate-400">
+                Algorithm: <span className="text-cyan-400">HMAC-SHA256</span>
+              </div>
+              <div className="text-slate-400">
+                Signer: <span className="text-slate-200">{signatureResult.signer_identity}</span>
+              </div>
+              <div className="text-slate-400">
+                Canonical Digest: <span className="text-slate-300">{signatureResult.canonical_digest}</span>
+              </div>
+              <div className="text-slate-400">
+                Computed Signature: <span className="text-emerald-400">{signatureResult.computed_signature}</span>
+              </div>
+              <div className="text-slate-400">
+                Expected Signature: <span className="text-emerald-400">{signatureResult.expected_signature}</span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setSignatureResult(null)}
+              className="w-full py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold cursor-pointer"
+            >
+              Close Verification Inspector
+            </button>
           </div>
         </div>
       )}

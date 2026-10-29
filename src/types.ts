@@ -85,6 +85,10 @@ export interface TrustPassport {
   created_at: string;
   content?: string;
   previous_passport?: TrustPassport | null;
+  signature?: string;
+  signature_algorithm?: string;
+  payload_digest?: string;
+  signed_at?: string;
 }
 
 export interface ChangeImpact {
@@ -130,6 +134,125 @@ export interface AuditLog {
   target_id: string;
   details: string;
   created_at: string;
+  prev_hash?: string;
+  payload_hash?: string;
+  chain_hash?: string;
+}
+
+export type UserRole = 'ADMIN' | 'CURATOR' | 'REVIEWER' | 'AUTHOR';
+
+export interface UserProfile {
+  id: string;
+  name: string;
+  role: UserRole;
+  title: string;
+  email: string;
+  avatar_initials: string;
+}
+
+export interface GraphNode {
+  id: string;
+  label: string;
+  sublabel?: string;
+  type:
+    | 'fact'
+    | 'fact_version'
+    | 'brand_rule'
+    | 'claim'
+    | 'asset'
+    | 'audit_run'
+    | 'evidence_source'
+    | 'trust_passport'
+    | 'decision'
+    | 'change_impact';
+  status?: string;
+  severity?: string;
+  governance_score?: number;
+  metadata?: Record<string, any>;
+  x?: number;
+  y?: number;
+}
+
+export interface GraphEdge {
+  id: string;
+  source: string;
+  target: string;
+  label: string;
+  relationship:
+    | 'SUPPORTS'
+    | 'CONTRADICTS'
+    | 'APPEARS_IN'
+    | 'EVALUATED_BY'
+    | 'RECORDED_IN'
+    | 'AFFECTS'
+    | 'CERTIFIES'
+    | 'REFERENCES'
+    | 'DERIVED_FROM';
+  status?: 'nominal' | 'alert' | 'warning' | 'info';
+}
+
+export interface GraphData {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  summary: {
+    total_nodes: number;
+    total_edges: number;
+    impacted_nodes_count: number;
+    contradictions_count: number;
+  };
+}
+
+export interface SimulateImpactResult {
+  fact_key: string;
+  fact_name: string;
+  current_value: string;
+  proposed_value: string;
+  affected_assets_count: number;
+  affected_claims_count: number;
+  simulated_findings: Array<{
+    asset_id: string;
+    asset_name: string;
+    asset_version: number;
+    claim_text: string;
+    current_status: 'SUPPORTED' | 'CONTRADICTED' | 'UNVERIFIED';
+    predicted_status: 'SUPPORTED' | 'CONTRADICTED' | 'UNVERIFIED';
+    status_changed: boolean;
+    explanation: string;
+    predicted_correction: string | null;
+  }>;
+  risk_severity: 'CRITICAL' | 'HIGH' | 'MODERATE' | 'LOW';
+  simulation_timestamp: string;
+}
+
+export interface HistoricalReplayResult {
+  asset_id: string;
+  asset_name: string;
+  asset_version: number;
+  audit_run_id: string;
+  passport_code: string;
+  audited_at: string;
+  original_score: number;
+  original_status: string;
+  original_claims: Array<{
+    claim_text: string;
+    status: string;
+    matched_fact_name: string;
+    fact_value_at_audit_time: string;
+    current_fact_value: string;
+    is_drifted: boolean;
+    drift_explanation?: string;
+  }>;
+  facts_used_at_audit: Array<{
+    key: string;
+    name: string;
+    version_then: number;
+    value_then: string;
+    current_version: number;
+    current_value: string;
+    has_evolved: boolean;
+  }>;
+  subsequent_fact_changes_count: number;
+  drift_detected: boolean;
 }
 
 export interface LiveSource {

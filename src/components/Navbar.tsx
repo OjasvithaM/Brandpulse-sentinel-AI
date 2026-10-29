@@ -11,6 +11,7 @@ import {
   ScrollText,
   Sliders,
   Radio,
+  Network,
 } from 'lucide-react';
 
 export type NavTab =
@@ -21,6 +22,7 @@ export type NavTab =
   | 'live_sources'
   | 'evidence_guard'
   | 'time_machine'
+  | 'impact_graph'
   | 'trust_passports'
   | 'review_queue'
   | 'audit_history'
@@ -74,6 +76,14 @@ export const Navbar: React.FC<NavbarProps> = ({
       badge: pendingImpactsCount > 0 ? pendingImpactsCount : null,
       badgeColor: 'bg-rose-500 text-white',
     },
+    {
+      id: 'impact_graph' as NavTab,
+      label: 'Impact Graph',
+      icon: Network,
+      highlight: true,
+      badge: pendingImpactsCount > 0 ? 'Radar' : null,
+      badgeColor: 'bg-cyan-500 text-slate-950 font-bold',
+    },
     { id: 'trust_passports' as NavTab, label: 'Trust Passports', icon: FileBadge },
     {
       id: 'review_queue' as NavTab,
@@ -87,7 +97,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   ];
 
   return (
-    <nav className="bg-white border-b border-slate-200 shadow-xs sticky top-16 z-30" aria-label="Governance Modules Sub-Navigation">
+    <nav className="bg-[#0b1220] border-b border-slate-800 shadow-md sticky top-16 z-30" aria-label="Governance Modules Sub-Navigation">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex space-x-1 sm:space-x-1.5 overflow-x-auto py-2 scrollbar-none items-center">
           {tabs.map((tab) => {
@@ -97,16 +107,16 @@ export const Navbar: React.FC<NavbarProps> = ({
               <button
                 key={tab.id}
                 onClick={() => onSelectTab(tab.id)}
-                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap cursor-pointer ${
+                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${
                   isActive
-                    ? 'bg-indigo-50 text-indigo-700 shadow-xs border border-indigo-200 font-semibold'
+                    ? 'bg-cyan-950/80 text-cyan-300 shadow-sm border border-cyan-700/80 font-semibold'
                     : tab.highlight
-                    ? 'bg-indigo-600/10 text-indigo-700 hover:bg-indigo-600/20 border border-indigo-200 font-medium'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-transparent'
+                    ? 'bg-slate-900/90 text-slate-200 hover:bg-slate-800 border border-slate-700/70 font-medium'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60 border border-transparent'
                 }`}
                 aria-current={isActive ? 'page' : undefined}
               >
-                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-indigo-600' : tab.highlight ? 'text-indigo-600' : 'text-slate-400'}`} />
+                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-cyan-400' : tab.highlight ? 'text-cyan-400' : 'text-slate-400'}`} />
                 <span>{tab.label}</span>
                 {tab.badge !== null && tab.badge !== undefined && (
                   <span

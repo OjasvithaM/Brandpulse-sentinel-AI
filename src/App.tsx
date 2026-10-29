@@ -8,6 +8,7 @@ import { SavedAuditsView } from './components/SavedAuditsView';
 import { KnowledgeBaseView } from './components/KnowledgeBaseView';
 import { EvidenceGuardView } from './components/EvidenceGuardView';
 import { BrandTimeMachineView } from './components/BrandTimeMachineView';
+import { ImpactGraphView } from './components/ImpactGraphView';
 import { TrustPassportsView } from './components/TrustPassportsView';
 import { ReviewQueueView } from './components/ReviewQueueView';
 import { AuditHistoryView } from './components/AuditHistoryView';
@@ -22,10 +23,12 @@ import {
   ReviewQueueItem,
   AuditLog,
   SavedAudit,
+  UserRole,
 } from './types';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<NavTab>('dashboard');
+  const [userRole, setUserRole] = useState<UserRole>('ADMIN');
   const [isDemoGuideOpen, setIsDemoGuideOpen] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [initialContentForEvidenceGuard, setInitialContentForEvidenceGuard] = useState('');
@@ -127,7 +130,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-slate-900">
+    <div className="min-h-screen bg-[#070b14] flex flex-col font-sans text-slate-100">
       {/* Redesigned Universal Header */}
       <Header
         activeTab={activeTab}
@@ -136,6 +139,8 @@ export default function App() {
         onResetDemo={handleResetDemo}
         isResetting={isResetting}
         savedAuditsCount={savedAuditsCount}
+        userRole={userRole}
+        onSelectRole={setUserRole}
       />
 
       {/* Sub-Navigation Bar */}
@@ -167,12 +172,21 @@ export default function App() {
           />
         )}
 
+        {activeTab === 'impact_graph' && (
+          <ImpactGraphView
+            userRole={userRole}
+            onNavigateToAudit={() => setActiveTab('saved_audits')}
+            onNavigateToPassport={() => setActiveTab('trust_passports')}
+            onNavigateToKnowledgeBase={() => setActiveTab('knowledge_base')}
+          />
+        )}
+
         {activeTab === 'new_audit' && (
           <NewAuditView
             approvedFacts={facts}
             brandRules={rules}
             onNavigateTab={setActiveTab}
-            onAuditCreated={(newAudit) => {
+            onAuditCreated={() => {
               loadAllData();
             }}
           />
@@ -251,12 +265,12 @@ export default function App() {
       </main>
 
       {/* Footer */}
-      <footer className="bg-white border-t border-slate-200 py-5 text-center text-xs text-slate-500">
+      <footer className="bg-[#0b1220] border-t border-slate-800 py-5 text-center text-xs text-slate-400">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center space-x-2">
-            <span className="font-bold text-slate-800">BrandPulse Sentinel AI</span>
+            <span className="font-bold text-slate-200">BrandPulse Sentinel AI</span>
             <span>•</span>
-            <span>Evidence-Based Brand Governance Platform</span>
+            <span className="text-cyan-400 font-mono text-[11px]">Evidence-Based Brand Governance Platform</span>
           </div>
           <span className="font-mono text-[11px] text-slate-400">
             Verify every claim. Track every change. Preserve every decision.

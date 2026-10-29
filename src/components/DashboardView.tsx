@@ -20,6 +20,7 @@ import {
   FileText,
   HelpCircle,
   ShieldAlert,
+  Network,
 } from 'lucide-react';
 import { DashboardStats, LiveSource, SavedAudit } from '../types';
 import { NavTab } from './Navbar';
@@ -212,6 +213,40 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* SIGNATURE INNOVATION: BRAND DRIFT IMPACT GRAPH CALLOUT */}
+      <div className="bg-[#0b1220] border-2 border-cyan-800/80 rounded-2xl p-5 shadow-2xl relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="absolute top-0 right-0 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="relative z-10 flex items-start sm:items-center gap-3.5">
+          <div className="w-12 h-12 rounded-xl bg-cyan-950 border border-cyan-800 text-cyan-400 flex items-center justify-center shadow-lg shadow-cyan-950 shrink-0">
+            <Network className="w-6 h-6 animate-pulse" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-cyan-950 border border-cyan-800 text-cyan-400 font-bold tracking-wider">
+                Signature Innovation
+              </span>
+              <span className="text-xs text-slate-400 font-mono">Real-Time Evidence Topology</span>
+            </div>
+            <h3 className="text-base sm:text-lg font-bold text-slate-100 mt-1">
+              Brand Drift Impact Graph & Simulation Radar
+            </h3>
+            <p className="text-xs text-slate-400 max-w-2xl mt-0.5 leading-relaxed">
+              Explore interconnected nodes between approved facts, version history, brand rules, published assets, and cascading drift vectors. Test proposed fact changes with zero database writes via in-memory dry-runs.
+            </p>
+          </div>
+        </div>
+
+        <div className="relative z-10 shrink-0 flex items-center gap-2">
+          <button
+            onClick={() => onNavigateTab('impact_graph')}
+            className="px-4 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-bold text-xs shadow-lg shadow-cyan-950 transition-all flex items-center gap-1.5 cursor-pointer"
+          >
+            <span>Open Impact Graph</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
         </div>
       </div>
 

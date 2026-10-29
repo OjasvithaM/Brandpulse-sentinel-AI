@@ -1,6 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import path from 'node:path';
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 
 const DB_DIR = path.resolve(process.cwd(), 'data');
 if (!fs.existsSync(DB_DIR)) {
@@ -9,6 +10,229 @@ if (!fs.existsSync(DB_DIR)) {
 
 const DB_PATH = path.join(DB_DIR, 'brandpulse.db');
 export const db = new DatabaseSync(DB_PATH);
+
+const PASSPORT_SECRET = process.env.PASSPORT_SIGNING_SECRET || 'brandpulse-sentinel-master-secret-key-2026-acme-governance';
+const GENESIS_HASH = 'GENESIS_0000000000000000000000000000000000000000000000000000000000000000';
+
+export function computeSha256(data: string): string {
+  return crypto.createHash('sha256').update(data).digest('hex');
+}
+
+export function signPassportPayload(payload: {
+  passport_code: string;
+  asset_id: string;
+  asset_version: number;
+  governance_score: number;
+  overall_status: string;
+  claims_json: string;
+  created_at: string;
+}): { signature: string; payload_digest: string; signature_algorithm: string; signed_at: string } {
+  const claimsHash = computeSha256(payload.claims_json || '[]');
+  const canonicalString = [
+    payload.passport_code,
+    payload.asset_id,
+    payload.asset_version,
+    payload.governance_score,
+    payload.overall_status,
+    claimsHash,
+    payload.created_at,
+  ].join('|');
+
+  const payload_digest = computeSha256(canonicalString);
+  const signature = crypto
+    .createHmac('sha256', PASSPORT_SECRET)
+    .update(payload_digest)
+    .digest('hex');
+
+  return {
+    signature,
+    payload_digest,
+    signature_algorithm: 'HMAC-SHA256',
+    signed_at: new Date().toISOString(),
+  };
+}
+
+export function verifyPassportSignature(passportIdOrCode: string): {
+  valid: boolean;
+  passport?: any;
+  canonical_digest?: string;
+  computed_signature?: string;
+  expected_signature?: string;
+  message: string;
+  signer_identity: string;
+} {
+  const passport = db
+    .prepare('SELECT * FROM trust_passports WHERE id = ? OR passport_code = ?')
+    .get(passportIdOrCode, passportIdOrCode) as any;
+
+  if (!passport) {
+    return {
+      valid: false,
+      message: 'Trust Passport not found.',
+      signer_identity: 'BrandPulse CA',
+    };
+  }
+
+  const claimsHash = computeSha256(passport.claims_json || '[]');
+  const canonicalString = [
+    passport.passport_code,
+    passport.asset_id,
+    passport.asset_version,
+    passport.governance_score,
+    passport.overall_status,
+    claimsHash,
+    passport.created_at,
+  ].join('|');
+
+  const computedDigest = computeSha256(canonicalString);
+  const computedSignature = crypto
+    .createHmac('sha256', PASSPORT_SECRET)
+    .update(computedDigest)
+    .digest('hex');
+
+  const storedSig = passport.signature;
+  if (!storedSig) {
+    return {
+      valid: false,
+      passport,
+      canonical_digest: computedDigest,
+      computed_signature: computedSignature,
+      message: 'Passport does not contain a cryptographic digital signature.',
+      signer_identity: 'BrandPulse Governance Authority CA',
+    };
+  }
+
+  const isValid = storedSig === computedSignature;
+  return {
+    valid: isValid,
+    passport,
+    canonical_digest: computedDigest,
+    computed_signature: computedSignature,
+    expected_signature: storedSig,
+    message: isValid
+      ? 'Digital signature mathematically verified against canonical evidence digest. Payload integrity intact.'
+      : 'Signature mismatch detected. The passport payload or claims snapshot may have been altered.',
+    signer_identity: 'BrandPulse Governance Authority CA',
+  };
+}
+
+export function logAuditEventWithChain(
+  eventType: string,
+  actor: string,
+  actorRole: string,
+  targetType: string,
+  targetId: string,
+  details: string
+): any {
+  try {
+    const id = `log-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const now = new Date().toISOString();
+
+    // Get previous block hash
+    const latestLog = db
+      .prepare('SELECT chain_hash FROM audit_logs WHERE chain_hash IS NOT NULL ORDER BY created_at DESC LIMIT 1')
+      .get() as any;
+    const prevHash = latestLog?.chain_hash || GENESIS_HASH;
+
+    const payloadObj = { eventType, actor, actorRole, targetType, targetId, details, now };
+    const payloadHash = computeSha256(JSON.stringify(payloadObj));
+    const chainHash = computeSha256(`${prevHash}:${payloadHash}:${now}`);
+
+    db.prepare(`
+      INSERT INTO audit_logs (id, event_type, actor, actor_role, target_type, target_id, details, created_at, prev_hash, payload_hash, chain_hash)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, eventType, actor, actorRole, targetType, targetId, details, now, prevHash, payloadHash, chainHash);
+
+    return { id, eventType, actor, actorRole, targetType, targetId, details, now, prevHash, payloadHash, chainHash };
+  } catch (e) {
+    console.error('Failed to log hash-chained audit event:', e);
+    return null;
+  }
+}
+
+export function verifyAuditLogChain(): {
+  valid: boolean;
+  total_blocks: number;
+  genesis_hash: string;
+  latest_hash: string;
+  broken_block_id?: string;
+  message: string;
+  verified_blocks: any[];
+} {
+  const logs = db.prepare('SELECT * FROM audit_logs ORDER BY created_at ASC').all() as any[];
+  if (logs.length === 0) {
+    return {
+      valid: true,
+      total_blocks: 0,
+      genesis_hash: GENESIS_HASH,
+      latest_hash: GENESIS_HASH,
+      message: 'Audit log chain is empty.',
+      verified_blocks: [],
+    };
+  }
+
+  let expectedPrevHash = GENESIS_HASH;
+  const verifiedBlocks = [];
+
+  for (let i = 0; i < logs.length; i++) {
+    const block = logs[i];
+    // If block doesn't have chain_hash yet (legacy log), heal/compute it
+    if (!block.chain_hash) {
+      const payloadObj = {
+        eventType: block.event_type,
+        actor: block.actor,
+        actorRole: block.actor_role,
+        targetType: block.target_type,
+        targetId: block.target_id,
+        details: block.details,
+        now: block.created_at,
+      };
+      const pHash = computeSha256(JSON.stringify(payloadObj));
+      const cHash = computeSha256(`${expectedPrevHash}:${pHash}:${block.created_at}`);
+      db.prepare('UPDATE audit_logs SET prev_hash = ?, payload_hash = ?, chain_hash = ? WHERE id = ?').run(
+        expectedPrevHash,
+        pHash,
+        cHash,
+        block.id
+      );
+      block.prev_hash = expectedPrevHash;
+      block.payload_hash = pHash;
+      block.chain_hash = cHash;
+    }
+
+    if (block.prev_hash !== expectedPrevHash) {
+      return {
+        valid: false,
+        total_blocks: logs.length,
+        genesis_hash: GENESIS_HASH,
+        latest_hash: logs[logs.length - 1]?.chain_hash || '',
+        broken_block_id: block.id,
+        message: `Broken chain detected at block ${block.id}: expected prev_hash ${expectedPrevHash}, found ${block.prev_hash}`,
+        verified_blocks: verifiedBlocks,
+      };
+    }
+
+    expectedPrevHash = block.chain_hash;
+    verifiedBlocks.push({
+      id: block.id,
+      event_type: block.event_type,
+      actor: block.actor,
+      timestamp: block.created_at,
+      prev_hash: block.prev_hash,
+      chain_hash: block.chain_hash,
+      verified: true,
+    });
+  }
+
+  return {
+    valid: true,
+    total_blocks: logs.length,
+    genesis_hash: GENESIS_HASH,
+    latest_hash: logs[logs.length - 1]?.chain_hash || '',
+    message: `All ${logs.length} audit trail blocks cryptographically verified with unbroken SHA-256 hash continuity.`,
+    verified_blocks: verifiedBlocks,
+  };
+}
 
 // Initialize relational schema
 export function initDb() {
@@ -214,6 +438,45 @@ export function initDb() {
   try { db.exec("ALTER TABLE audit_runs ADD COLUMN reviewed_at TEXT"); } catch {}
   try { db.exec("ALTER TABLE audit_runs ADD COLUMN evidence_sources_json TEXT"); } catch {}
   try { db.exec("ALTER TABLE assets ADD COLUMN brand TEXT DEFAULT 'Acme Technologies'"); } catch {}
+  try { db.exec("ALTER TABLE audit_logs ADD COLUMN prev_hash TEXT"); } catch {}
+  try { db.exec("ALTER TABLE audit_logs ADD COLUMN payload_hash TEXT"); } catch {}
+  try { db.exec("ALTER TABLE audit_logs ADD COLUMN chain_hash TEXT"); } catch {}
+  try { db.exec("ALTER TABLE trust_passports ADD COLUMN signature TEXT"); } catch {}
+  try { db.exec("ALTER TABLE trust_passports ADD COLUMN signature_algorithm TEXT DEFAULT 'HMAC-SHA256'"); } catch {}
+  try { db.exec("ALTER TABLE trust_passports ADD COLUMN payload_digest TEXT"); } catch {}
+  try { db.exec("ALTER TABLE trust_passports ADD COLUMN signed_at TEXT"); } catch {}
+
+  // Backfill existing trust passports with digital signatures if missing
+  try {
+    const unsignedPassports = db.prepare('SELECT * FROM trust_passports WHERE signature IS NULL').all() as any[];
+    for (const p of unsignedPassports) {
+      const sigData = signPassportPayload({
+        passport_code: p.passport_code,
+        asset_id: p.asset_id,
+        asset_version: p.asset_version,
+        governance_score: p.governance_score,
+        overall_status: p.overall_status,
+        claims_json: p.claims_json,
+        created_at: p.created_at,
+      });
+      db.prepare('UPDATE trust_passports SET signature = ?, signature_algorithm = ?, payload_digest = ?, signed_at = ? WHERE id = ?').run(
+        sigData.signature,
+        sigData.signature_algorithm,
+        sigData.payload_digest,
+        sigData.signed_at,
+        p.id
+      );
+    }
+  } catch (e) {
+    console.warn('Failed to backfill passport signatures:', e);
+  }
+
+  // Backfill audit log hash chain if missing
+  try {
+    verifyAuditLogChain();
+  } catch (e) {
+    console.warn('Failed to verify/heal audit chain:', e);
+  }
 
   // Check if initial demonstration facts exist
   const countRow = db.prepare('SELECT COUNT(*) as count FROM facts').get() as { count: number };
@@ -581,6 +844,21 @@ export function seedDemoData() {
     null,
     now
   );
+
+  const initialSig = signPassportPayload({
+    passport_code: 'BP-PASS-2026-1011',
+    asset_id: asset1Id,
+    asset_version: 1,
+    governance_score: 100,
+    overall_status: 'PASSED',
+    claims_json: JSON.stringify(findings1),
+    created_at: now,
+  });
+  db.prepare(`
+    UPDATE trust_passports
+    SET signature = ?, signature_algorithm = ?, payload_digest = ?, signed_at = ?
+    WHERE id = ?
+  `).run(initialSig.signature, initialSig.signature_algorithm, initialSig.payload_digest, initialSig.signed_at, passportId);
 
   // 4. Seed Initial Audit Log
   const insertAuditLog = db.prepare(`

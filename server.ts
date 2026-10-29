@@ -1,7 +1,17 @@
 import express from 'express';
 import path from 'node:path';
 import dotenv from 'dotenv';
-import { db, initDb, resetDbToDemo } from './server/db';
+import {
+  db,
+  initDb,
+  resetDbToDemo,
+  computeSha256,
+  signPassportPayload,
+  verifyPassportSignature,
+  logAuditEventWithChain,
+  verifyAuditLogChain,
+} from './server/db';
+import { EVALUATION_DATASET, BENCHMARK_METRICS } from './server/evaluationDataset';
 import { runEvidenceGuardVerification } from './server/verification';
 import {
   Fact,
@@ -27,7 +37,38 @@ app.use(express.json({ limit: '10mb' }));
 // Initialize SQLite database
 initDb();
 
-// Helper to log audit events
+// RBAC Role extraction
+type UserRole = 'ADMIN' | 'CURATOR' | 'REVIEWER' | 'AUTHOR';
+
+function getActorContext(req: express.Request): { actor: string; role: UserRole } {
+  const roleHeader = (req.headers['x-user-role'] as string)?.toUpperCase();
+  const validRoles: UserRole[] = ['ADMIN', 'CURATOR', 'REVIEWER', 'AUTHOR'];
+  const role: UserRole = validRoles.includes(roleHeader as UserRole) ? (roleHeader as UserRole) : 'ADMIN';
+  const defaultNames: Record<UserRole, string> = {
+    ADMIN: 'Chief Brand Officer',
+    CURATOR: 'Knowledge Base Curator',
+    REVIEWER: 'Senior Compliance Reviewer',
+    AUTHOR: 'Marketing Content Author',
+  };
+  const actor = (req.headers['x-user-name'] as string) || defaultNames[role];
+  return { actor, role };
+}
+
+function requireRole(allowedRoles: UserRole[]) {
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const { role } = getActorContext(req);
+    if (!allowedRoles.includes(role)) {
+      return res.status(403).json({
+        error: `Permission Denied: Current session role "${role}" is not authorized for this operation. Required role: ${allowedRoles.join(' or ')}.`,
+        requiredRoles: allowedRoles,
+        currentRole: role,
+      });
+    }
+    next();
+  };
+}
+
+// Helper to log audit events with cryptographic SHA-256 hash chaining
 function logAuditEvent(
   eventType: string,
   actor: string,
@@ -37,14 +78,10 @@ function logAuditEvent(
   details: string
 ) {
   try {
-    const id = `log-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-    const now = new Date().toISOString();
-    db.prepare(`
-      INSERT INTO audit_logs (id, event_type, actor, actor_role, target_type, target_id, details, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, eventType, actor, actorRole, targetType, targetId, details, now);
+    return logAuditEventWithChain(eventType, actor, actorRole, targetType, targetId, details);
   } catch (e) {
     console.error('Failed to log audit event:', e);
+    return null;
   }
 }
 
@@ -516,10 +553,35 @@ app.post('/api/passports', (req, res) => {
 
     const passportId = `pass-${Date.now()}`;
     const passportCode = `BP-PASS-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+    const claimsJson = JSON.stringify(findingsList);
+    const evidenceJson = JSON.stringify(evidenceSources);
+    const scoreVal = governance_score || 100;
+    const statusVal = overall_status || 'PASSED';
+    const decisionVal = decision || (statusVal === 'PASSED' ? 'APPROVED' : 'PENDING');
+    const reviewerName = reviewer_name || 'Compliance Reviewer';
+    const reviewerRole = reviewer_role || 'Brand Officer';
+    const rationale = decision_rationale || 'Verified against Acme Approved Knowledge Base.';
+
+    // Cryptographically sign the passport payload
+    const sigResult = signPassportPayload({
+      passport_code: passportCode,
+      asset_id: targetAssetId,
+      asset_version: nextVersion,
+      governance_score: scoreVal,
+      overall_status: statusVal,
+      claims_json: claimsJson,
+      created_at: now,
+    });
 
     db.prepare(`
-      INSERT INTO trust_passports (id, passport_code, asset_id, asset_name, asset_version, audit_run_id, overall_status, governance_score, claims_json, evidence_sources_json, reviewer_name, reviewer_role, human_decision, decision_rationale, decision_timestamp, previous_passport_id, is_latest, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+      INSERT INTO trust_passports (
+        id, passport_code, asset_id, asset_name, asset_version, audit_run_id,
+        overall_status, governance_score, claims_json, evidence_sources_json,
+        reviewer_name, reviewer_role, human_decision, decision_rationale,
+        decision_timestamp, previous_passport_id, is_latest, created_at,
+        signature, signature_algorithm, payload_digest, signed_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)
     `).run(
       passportId,
       passportCode,
@@ -527,26 +589,30 @@ app.post('/api/passports', (req, res) => {
       asset_name,
       nextVersion,
       auditRunId,
-      overall_status || 'PASSED',
-      governance_score || 100,
-      JSON.stringify(findingsList),
-      JSON.stringify(evidenceSources),
-      reviewer_name || 'Compliance Reviewer',
-      reviewer_role || 'Brand Officer',
-      decision || (overall_status === 'PASSED' ? 'APPROVED' : 'PENDING'),
-      decision_rationale || 'Verified against Acme Approved Knowledge Base.',
+      statusVal,
+      scoreVal,
+      claimsJson,
+      evidenceJson,
+      reviewerName,
+      reviewerRole,
+      decisionVal,
+      rationale,
       now,
       previousPassport?.id || null,
-      now
+      now,
+      sigResult.signature,
+      sigResult.signature_algorithm,
+      sigResult.payload_digest,
+      sigResult.signed_at
     );
 
     logAuditEvent(
       'TRUST_PASSPORT_ISSUED',
-      reviewer_name || 'Compliance Reviewer',
-      reviewer_role || 'Brand Officer',
+      reviewerName,
+      reviewerRole,
       'TRUST_PASSPORT',
       passportCode,
-      `Trust Passport ${passportCode} issued for "${asset_name}" v${nextVersion}. Status: ${overall_status}`
+      `Trust Passport ${passportCode} issued with cryptographic HMAC-SHA256 signature for "${asset_name}" v${nextVersion}. Status: ${statusVal}`
     );
 
     const savedPassport = db.prepare('SELECT * FROM trust_passports WHERE id = ?').get(passportId);
@@ -604,6 +670,17 @@ app.get('/api/passports/:id', (req, res) => {
       content: assetVersion?.content || '',
       previous_passport: previousPassport,
     });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Verify HMAC-SHA256 signature and cryptographic integrity
+app.get('/api/passports/:id/verify-signature', (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = verifyPassportSignature(id);
+    res.json(result);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -898,13 +975,30 @@ app.post('/api/audits', async (req, res) => {
     if (auto_passport !== false) {
       const passportId = `pass-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
       passportCode = `BP-PASS-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+      const claimsJson = JSON.stringify(findings);
+      const evidenceJson = JSON.stringify(evidenceList);
+      const reviewer = reviewer_name || 'System Auditor';
+      const reviewerRole = 'Compliance Reviewer';
+      const rationale = governanceResult.status === 'PASSED' ? 'Automatic baseline verification passed.' : 'Initial audit completed; awaiting reviewer sign-off.';
+
+      const sigResult = signPassportPayload({
+        passport_code: passportCode,
+        asset_id: assetId,
+        asset_version: 1,
+        governance_score: governanceResult.score,
+        overall_status: governanceResult.status,
+        claims_json: claimsJson,
+        created_at: now,
+      });
+
       db.prepare(`
         INSERT INTO trust_passports (
           id, passport_code, asset_id, asset_name, asset_version, audit_run_id,
           overall_status, governance_score, claims_json, evidence_sources_json,
           reviewer_name, reviewer_role, human_decision, decision_rationale,
-          decision_timestamp, is_latest, created_at
-        ) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+          decision_timestamp, is_latest, created_at,
+          signature, signature_algorithm, payload_digest, signed_at
+        ) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)
       `).run(
         passportId,
         passportCode,
@@ -913,14 +1007,18 @@ app.post('/api/audits', async (req, res) => {
         auditRunId,
         governanceResult.status,
         governanceResult.score,
-        JSON.stringify(findings),
-        JSON.stringify(evidenceList),
-        reviewer_name || 'System Auditor',
-        'Compliance Reviewer',
+        claimsJson,
+        evidenceJson,
+        reviewer,
+        reviewerRole,
         reviewStatus,
-        governanceResult.status === 'PASSED' ? 'Automatic baseline verification passed.' : 'Initial audit completed; awaiting reviewer sign-off.',
+        rationale,
         now,
-        now
+        now,
+        sigResult.signature,
+        sigResult.signature_algorithm,
+        sigResult.payload_digest,
+        sigResult.signed_at
       );
     }
 
@@ -1137,10 +1235,32 @@ app.post('/api/reviews/:assetId/decision', (req, res) => {
     // Issue updated Trust Passport
     const passportId = `pass-${Date.now()}`;
     const passportCode = `BP-PASS-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+    const overallStatus = decision === 'APPROVED' ? 'PASSED' : decision === 'CONDITIONAL' ? 'CONDITIONAL' : 'FAILED';
+    const govScore = decision === 'APPROVED' ? 100 : 70;
+    const claimsJson = prevPassport?.claims_json || '[]';
+    const evidenceJson = prevPassport?.evidence_sources_json || '[]';
+    const reviewerName = reviewer_name || 'Senior Compliance Reviewer';
+    const reviewerRole = reviewer_role || 'Brand Governance Lead';
+
+    const sigResult = signPassportPayload({
+      passport_code: passportCode,
+      asset_id: assetId,
+      asset_version: newVersion,
+      governance_score: govScore,
+      overall_status: overallStatus,
+      claims_json: claimsJson,
+      created_at: now,
+    });
 
     db.prepare(`
-      INSERT INTO trust_passports (id, passport_code, asset_id, asset_name, asset_version, audit_run_id, overall_status, governance_score, claims_json, evidence_sources_json, reviewer_name, reviewer_role, human_decision, decision_rationale, decision_timestamp, previous_passport_id, is_latest, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+      INSERT INTO trust_passports (
+        id, passport_code, asset_id, asset_name, asset_version, audit_run_id,
+        overall_status, governance_score, claims_json, evidence_sources_json,
+        reviewer_name, reviewer_role, human_decision, decision_rationale,
+        decision_timestamp, previous_passport_id, is_latest, created_at,
+        signature, signature_algorithm, payload_digest, signed_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)
     `).run(
       passportId,
       passportCode,
@@ -1148,17 +1268,21 @@ app.post('/api/reviews/:assetId/decision', (req, res) => {
       asset.name,
       newVersion,
       prevPassport?.audit_run_id || 'manual-review',
-      decision === 'APPROVED' ? 'PASSED' : decision === 'CONDITIONAL' ? 'CONDITIONAL' : 'FAILED',
-      decision === 'APPROVED' ? 100 : 70,
-      prevPassport?.claims_json || '[]',
-      prevPassport?.evidence_sources_json || '[]',
-      reviewer_name || 'Senior Compliance Reviewer',
-      reviewer_role || 'Brand Governance Lead',
+      overallStatus,
+      govScore,
+      claimsJson,
+      evidenceJson,
+      reviewerName,
+      reviewerRole,
       decision,
       rationale,
       now,
       prevPassport?.id || null,
-      now
+      now,
+      sigResult.signature,
+      sigResult.signature_algorithm,
+      sigResult.payload_digest,
+      sigResult.signed_at
     );
 
     logAuditEvent(
@@ -1184,6 +1308,597 @@ app.get('/api/audit-logs', (req, res) => {
   try {
     const logs = db.prepare('SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT 100').all();
     res.json(logs);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Cryptographic SHA-256 Hash-Chain Verification
+app.get('/api/audit-logs/verify-chain', (req, res) => {
+  try {
+    const result = verifyAuditLogChain();
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// -------------------------------------------------------------
+// BRAND DRIFT IMPACT GRAPH & SIMULATION API
+// -------------------------------------------------------------
+app.get('/api/graph', (req, res) => {
+  try {
+    const { brand, severity, search, type } = req.query;
+
+    const facts = db.prepare('SELECT * FROM facts WHERE is_current = 1').all() as any[];
+    const history = db.prepare('SELECT * FROM fact_history ORDER BY created_at DESC LIMIT 40').all() as any[];
+    const rules = db.prepare("SELECT * FROM brand_rules WHERE status = 'active'").all() as any[];
+    const assets = db.prepare('SELECT * FROM assets').all() as any[];
+    const passports = db.prepare('SELECT * FROM trust_passports WHERE is_latest = 1').all() as any[];
+    const impacts = db.prepare("SELECT * FROM change_impacts WHERE alert_status = 'PENDING'").all() as any[];
+    const liveSources = db.prepare('SELECT * FROM live_sources WHERE is_active = 1').all() as any[];
+    const audits = db.prepare('SELECT id, brand, overall_status, governance_score, asset_id, created_at FROM audit_runs ORDER BY created_at DESC LIMIT 10').all() as any[];
+
+    const nodes: any[] = [];
+    const edges: any[] = [];
+    const nodeIds = new Set<string>();
+
+    const addNode = (node: any) => {
+      if (!nodeIds.has(node.id)) {
+        nodeIds.add(node.id);
+        nodes.push(node);
+      }
+    };
+
+    // 1. Facts & Versions
+    for (const f of facts) {
+      addNode({
+        id: f.id,
+        label: f.name,
+        type: 'FACT',
+        status: f.status,
+        metadata: {
+          key: f.key,
+          category: f.category,
+          value: f.value,
+          version: f.version,
+          source_ref: f.source_ref,
+        },
+      });
+    }
+
+    for (const h of history) {
+      const histNodeId = `node-hist-${h.id}`;
+      addNode({
+        id: histNodeId,
+        label: `v${h.version}: ${h.value.substring(0, 24)}`,
+        type: 'FACT_VERSION',
+        status: h.status,
+        metadata: {
+          fact_id: h.fact_id,
+          version: h.version,
+          value: h.value,
+          change_reason: h.change_reason,
+          changed_by: h.changed_by,
+        },
+      });
+      edges.push({
+        id: `edge-hist-${h.id}`,
+        source: h.fact_id,
+        target: histNodeId,
+        label: `v${h.version}`,
+        type: 'SUPERSEDES',
+      });
+    }
+
+    // 2. Brand Rules
+    for (const r of rules) {
+      addNode({
+        id: r.id,
+        label: r.name,
+        type: 'RULE',
+        status: r.status,
+        metadata: {
+          rule_code: r.rule_code,
+          severity: r.severity,
+          constraint_value: r.constraint_value,
+        },
+      });
+    }
+
+    // 3. Assets
+    for (const a of assets) {
+      addNode({
+        id: a.id,
+        label: a.name,
+        type: 'ASSET',
+        status: a.status,
+        metadata: {
+          brand: a.brand || 'Acme Technologies',
+          channel: a.channel,
+          current_version: a.current_version,
+        },
+      });
+    }
+
+    // 4. Trust Passports & Claims connections
+    for (const p of passports) {
+      addNode({
+        id: p.id,
+        label: p.passport_code,
+        type: 'TRUST_PASSPORT',
+        status: p.overall_status,
+        metadata: {
+          asset_id: p.asset_id,
+          asset_name: p.asset_name,
+          version: p.asset_version,
+          governance_score: p.governance_score,
+          human_decision: p.human_decision,
+          signature: p.signature,
+          signed_at: p.signed_at,
+        },
+      });
+
+      edges.push({
+        id: `edge-passport-${p.id}`,
+        source: p.id,
+        target: p.asset_id,
+        label: 'CERTIFIES',
+        type: 'CERTIFIES',
+      });
+
+      // Parse claims in passport and link to facts/rules
+      try {
+        const claims = JSON.parse(p.claims_json || '[]');
+        for (let i = 0; i < claims.length; i++) {
+          const c = claims[i];
+          if (c.matched_fact?.id && nodeIds.has(c.matched_fact.id)) {
+            edges.push({
+              id: `edge-claim-${p.id}-${c.matched_fact.id}-${i}`,
+              source: p.asset_id,
+              target: c.matched_fact.id,
+              label: c.status === 'SUPPORTED' ? 'EVIDENCE_BACKED' : 'DRIFT_RISK',
+              type: 'CITES_FACT',
+              metadata: { claim_text: c.claim_text, status: c.status },
+            });
+          }
+        }
+      } catch {}
+    }
+
+    // 5. Change Impacts (The Active Drift Edges)
+    for (const imp of impacts) {
+      const impNodeId = `node-imp-${imp.id}`;
+      addNode({
+        id: impNodeId,
+        label: `Drift Alert: ${imp.fact_name}`,
+        type: 'CHANGE_IMPACT',
+        status: imp.alert_status,
+        metadata: {
+          severity: imp.impact_risk,
+          impact_reason: imp.impact_reason,
+          old_value: imp.old_value,
+          new_value: imp.new_value,
+          impacted_claim_text: imp.impacted_claim_text,
+          asset_name: imp.asset_name,
+        },
+      });
+
+      edges.push({
+        id: `edge-imp-fact-${imp.id}`,
+        source: imp.fact_id,
+        target: impNodeId,
+        label: 'MODIFIED_FACT',
+        type: 'TRIGGERS_DRIFT',
+        animated: true,
+      });
+
+      edges.push({
+        id: `edge-imp-asset-${imp.id}`,
+        source: impNodeId,
+        target: imp.asset_id,
+        label: 'INVALIDATES_ASSET',
+        type: 'IMPACTS',
+        animated: true,
+      });
+    }
+
+    // 6. Live Sources
+    for (const ls of liveSources) {
+      addNode({
+        id: ls.id,
+        label: ls.name,
+        type: 'LIVE_SOURCE',
+        status: ls.last_sync_status,
+        metadata: {
+          freshness: ls.data_freshness,
+          endpoint: ls.endpoint_url,
+          interval: ls.sync_interval_mins,
+        },
+      });
+      // Link to pricing or SLA facts
+      if (ls.name.toLowerCase().includes('pricing')) {
+        const pricingFact = facts.find((f) => f.key === 'acme_cloud_pro_price');
+        if (pricingFact) {
+          edges.push({
+            id: `edge-ls-${ls.id}-${pricingFact.id}`,
+            source: ls.id,
+            target: pricingFact.id,
+            label: 'LIVE_FEED',
+            type: 'FEEDS',
+          });
+        }
+      } else if (ls.name.toLowerCase().includes('sla') || ls.name.toLowerCase().includes('status')) {
+        const slaFact = facts.find((f) => f.key === 'enterprise_sla_uptime');
+        if (slaFact) {
+          edges.push({
+            id: `edge-ls-${ls.id}-${slaFact.id}`,
+            source: ls.id,
+            target: slaFact.id,
+            label: 'LIVE_FEED',
+            type: 'FEEDS',
+          });
+        }
+      }
+    }
+
+    // Apply filters if provided
+    let filteredNodes = nodes;
+    if (type && type !== 'ALL') {
+      filteredNodes = filteredNodes.filter((n) => n.type === type);
+    }
+    if (search) {
+      const q = String(search).toLowerCase();
+      filteredNodes = filteredNodes.filter(
+        (n) => n.label.toLowerCase().includes(q) || JSON.stringify(n.metadata).toLowerCase().includes(q)
+      );
+    }
+
+    const filteredNodeIds = new Set(filteredNodes.map((n) => n.id));
+    const filteredEdges = edges.filter(
+      (e) => filteredNodeIds.has(e.source) && filteredNodeIds.has(e.target)
+    );
+
+    res.json({
+      nodes: filteredNodes,
+      edges: filteredEdges,
+      summary: {
+        total_nodes: nodes.length,
+        total_edges: edges.length,
+        active_impacts: impacts.length,
+        verified_passports: passports.length,
+        live_connectors: liveSources.length,
+        monitored_assets: assets.length,
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// SIMULATE IMPACT: Preview dependent claims & predicted status changes without DB mutations
+app.post('/api/facts/simulate-impact', async (req, res) => {
+  try {
+    const { fact_id, proposed_value, proposed_name } = req.body;
+    if (!fact_id || !proposed_value) {
+      return res.status(400).json({ error: 'fact_id and proposed_value are required for impact simulation.' });
+    }
+
+    const currentFact = db.prepare('SELECT * FROM facts WHERE id = ?').get(fact_id) as any;
+    if (!currentFact) {
+      return res.status(404).json({ error: `Fact with ID "${fact_id}" not found in Knowledge Base.` });
+    }
+
+    const currentFacts = db.prepare('SELECT * FROM facts WHERE is_current = 1').all() as unknown as Fact[];
+    const brandRules = db.prepare("SELECT * FROM brand_rules WHERE status = 'active'").all() as unknown as BrandRule[];
+
+    // Construct simulated in-memory facts (pure dry-run without writing to database)
+    const simulatedFacts: Fact[] = currentFacts.map((f) => {
+      if (f.id === fact_id) {
+        return {
+          ...f,
+          value: proposed_value.trim(),
+          name: proposed_name ? proposed_name.trim() : f.name,
+          version: f.version + 1,
+        };
+      }
+      return f;
+    });
+
+    // Inspect all monitored assets with latest content
+    const monitoredAssets = db.prepare(`
+      SELECT a.id, a.name, a.channel, a.current_version, av.content,
+             p.governance_score as current_score, p.overall_status as current_status
+      FROM assets a
+      JOIN asset_versions av ON a.id = av.asset_id AND a.current_version = av.version
+      LEFT JOIN trust_passports p ON a.id = p.asset_id AND p.is_latest = 1
+    `).all() as any[];
+
+    const simulatedImpacts = [];
+    let affectedAssetsCount = 0;
+    let affectedClaimsCount = 0;
+
+    for (const asset of monitoredAssets) {
+      if (!asset.content) continue;
+
+      // Verification under current facts
+      const currentVerification = await runEvidenceGuardVerification(asset.content, currentFacts, brandRules);
+      // Verification under proposed simulated facts
+      const simulatedVerification = await runEvidenceGuardVerification(asset.content, simulatedFacts, brandRules);
+
+      const currentGov = calculateGovernanceScore(currentVerification.findings);
+      const simulatedGov = calculateGovernanceScore(simulatedVerification.findings);
+
+      // Detect status changes in claims
+      const driftedClaims = [];
+      for (let i = 0; i < simulatedVerification.findings.length; i++) {
+        const simFinding = simulatedVerification.findings[i];
+        const curFinding = currentVerification.findings[i];
+
+        const isImpacted =
+          (curFinding?.status === 'SUPPORTED' && simFinding.status !== 'SUPPORTED') ||
+          (curFinding?.status !== 'CONTRADICTED' && simFinding.status === 'CONTRADICTED') ||
+          (simFinding.matched_fact?.id === fact_id);
+
+        if (isImpacted) {
+          driftedClaims.push({
+            claim_text: simFinding.claim_text,
+            current_status: curFinding?.status || 'UNVERIFIED',
+            predicted_status: simFinding.status,
+            current_evidence: curFinding?.matched_fact?.approved_value || currentFact.value,
+            predicted_evidence: proposed_value,
+            explanation: simFinding.explanation,
+          });
+        }
+      }
+
+      if (driftedClaims.length > 0 || currentGov.score !== simulatedGov.score) {
+        affectedAssetsCount++;
+        affectedClaimsCount += driftedClaims.length;
+        simulatedImpacts.push({
+          asset_id: asset.id,
+          asset_name: asset.name,
+          channel: asset.channel,
+          current_version: asset.current_version,
+          current_score: currentGov.score,
+          predicted_score: simulatedGov.score,
+          score_delta: simulatedGov.score - currentGov.score,
+          current_status: currentGov.status,
+          predicted_status: simulatedGov.status,
+          impacted_claims: driftedClaims,
+          severity: simulatedGov.score < 70 ? 'HIGH' : simulatedGov.score < 90 ? 'MEDIUM' : 'LOW',
+        });
+      }
+    }
+
+    const overallSeverity =
+      simulatedImpacts.some((i) => i.severity === 'HIGH')
+        ? 'HIGH'
+        : simulatedImpacts.some((i) => i.severity === 'MEDIUM')
+        ? 'MEDIUM'
+        : 'LOW';
+
+    res.json({
+      simulation_id: `sim-${Date.now()}`,
+      fact_id,
+      fact_name: currentFact.name,
+      current_value: currentFact.value,
+      proposed_value: proposed_value.trim(),
+      affected_assets_count: affectedAssetsCount,
+      affected_claims_count: affectedClaimsCount,
+      severity: overallSeverity,
+      impacts: simulatedImpacts,
+      summary: `Changing "${currentFact.name}" from "${currentFact.value}" to "${proposed_value}" will affect ${affectedAssetsCount} asset(s) and alter ${affectedClaimsCount} verified claim(s). Overall drift risk is ${overallSeverity}.`,
+      simulated_at: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// HISTORICAL DECISION REPLAY: Audit Review vs Current Knowledge Base
+app.get('/api/audits/:id/replay', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const auditRun = db.prepare(`
+      SELECT ar.*, a.name as asset_name, a.channel, av.content, tp.passport_code,
+             tp.signature, tp.human_decision, tp.decision_rationale, tp.decision_timestamp
+      FROM audit_runs ar
+      LEFT JOIN assets a ON ar.asset_id = a.id
+      LEFT JOIN asset_versions av ON ar.asset_id = av.asset_id AND ar.asset_version = av.version
+      LEFT JOIN trust_passports tp ON ar.id = tp.audit_run_id
+      WHERE ar.id = ?
+    `).get(id) as any;
+
+    if (!auditRun) {
+      return res.status(404).json({ error: `Audit run with ID "${id}" not found.` });
+    }
+
+    let historicalFindings: any[] = [];
+    try {
+      historicalFindings = JSON.parse(auditRun.findings_json || '[]');
+    } catch {}
+
+    const contentToVerify = auditRun.content || '';
+    const currentFacts = db.prepare('SELECT * FROM facts WHERE is_current = 1').all() as unknown as Fact[];
+    const brandRules = db.prepare("SELECT * FROM brand_rules WHERE status = 'active'").all() as unknown as BrandRule[];
+
+    // Re-verify against current facts
+    const currentVerification = await runEvidenceGuardVerification(contentToVerify, currentFacts, brandRules);
+    const currentGov = calculateGovernanceScore(currentVerification.findings);
+
+    // Identify drift
+    const driftItems: any[] = [];
+    for (let i = 0; i < historicalFindings.length; i++) {
+      const hist = historicalFindings[i];
+      const cur = currentVerification.findings[i];
+
+      const hasDrifted =
+        (hist.status === 'SUPPORTED' && cur?.status !== 'SUPPORTED') ||
+        (hist.status !== 'CONTRADICTED' && cur?.status === 'CONTRADICTED');
+
+      if (hasDrifted) {
+        driftItems.push({
+          claim_text: hist.claim_text,
+          historical_status: hist.status,
+          current_status: cur?.status || 'UNVERIFIED',
+          historical_evidence: hist.matched_fact?.approved_value || 'N/A',
+          current_evidence: cur?.matched_fact?.approved_value || 'None (Fact changed or removed)',
+          reason: cur?.explanation || 'Fact status changed since historical audit approval.',
+        });
+      }
+    }
+
+    const driftDetected = driftItems.length > 0 || currentGov.score < auditRun.governance_score;
+
+    res.json({
+      audit_id: auditRun.id,
+      asset_id: auditRun.asset_id,
+      asset_name: auditRun.asset_name,
+      historical: {
+        created_at: auditRun.created_at,
+        governance_score: auditRun.governance_score,
+        overall_status: auditRun.overall_status,
+        decision: auditRun.human_decision || auditRun.review_status,
+        rationale: auditRun.decision_rationale || auditRun.reviewer_notes,
+        findings: historicalFindings,
+      },
+      current: {
+        replayed_at: new Date().toISOString(),
+        governance_score: currentGov.score,
+        overall_status: currentGov.status,
+        findings: currentVerification.findings,
+      },
+      score_delta: currentGov.score - auditRun.governance_score,
+      drift_detected: driftDetected,
+      drift_items: driftItems,
+      summary: driftDetected
+        ? `Brand drift detected! Governance score dropped from ${auditRun.governance_score}% to ${currentGov.score}%. ${driftItems.length} claim(s) are no longer supported by the current Knowledge Base.`
+        : `Integrity preserved. Content remains 100% compliant with current approved facts and brand rules.`,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// BULK REVALIDATION: Re-evaluates all pending change impacts using EvidenceGuard
+app.post('/api/impacts/bulk-revalidate', async (req, res) => {
+  try {
+    const { actor, rationale } = req.body;
+    const actorName = actor || 'Chief Brand Officer';
+    const reasonText = rationale || 'Bulk revalidation of pending drift impacts against latest Knowledge Base.';
+
+    const pendingImpacts = db.prepare("SELECT * FROM change_impacts WHERE alert_status = 'PENDING'").all() as any[];
+    if (pendingImpacts.length === 0) {
+      return res.json({ message: 'No pending change impacts require revalidation.', processed_count: 0 });
+    }
+
+    const currentFacts = db.prepare('SELECT * FROM facts WHERE is_current = 1').all() as unknown as Fact[];
+    const brandRules = db.prepare("SELECT * FROM brand_rules WHERE status = 'active'").all() as unknown as BrandRule[];
+
+    // Group impacts by asset
+    const assetIds = Array.from(new Set(pendingImpacts.map((i) => i.asset_id)));
+    const now = new Date().toISOString();
+    let revalidatedCount = 0;
+
+    for (const assetId of assetIds) {
+      const asset = db.prepare('SELECT * FROM assets WHERE id = ?').get(assetId) as any;
+      if (!asset) continue;
+
+      const latestVersion = db.prepare(`
+        SELECT * FROM asset_versions WHERE asset_id = ? AND version = ?
+      `).get(assetId, asset.current_version) as any;
+
+      if (!latestVersion) continue;
+
+      // Run fresh EvidenceGuard verification
+      const verification = await runEvidenceGuardVerification(latestVersion.content, currentFacts, brandRules);
+      const govResult = calculateGovernanceScore(verification.findings);
+
+      // Create new version and signed Trust Passport
+      const newVersion = asset.current_version + 1;
+      db.prepare(`
+        INSERT INTO asset_versions (id, asset_id, version, content, author, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(`ver-${assetId}-v${newVersion}`, assetId, newVersion, latestVersion.content, actorName, now);
+
+      db.prepare('UPDATE assets SET current_version = ?, status = ?, updated_at = ? WHERE id = ?').run(
+        newVersion,
+        govResult.status === 'PASSED' ? 'verified' : 'pending_review',
+        now,
+        assetId
+      );
+
+      // Invalidate old passport
+      db.prepare('UPDATE trust_passports SET is_latest = 0 WHERE asset_id = ?').run(assetId);
+
+      // Issue new passport
+      const passportId = `pass-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+      const passportCode = `BP-PASS-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+      const claimsJson = JSON.stringify(verification.findings);
+
+      const sigResult = signPassportPayload({
+        passport_code: passportCode,
+        asset_id: assetId,
+        asset_version: newVersion,
+        governance_score: govResult.score,
+        overall_status: govResult.status,
+        claims_json: claimsJson,
+        created_at: now,
+      });
+
+      db.prepare(`
+        INSERT INTO trust_passports (
+          id, passport_code, asset_id, asset_name, asset_version, audit_run_id,
+          overall_status, governance_score, claims_json, evidence_sources_json,
+          reviewer_name, reviewer_role, human_decision, decision_rationale,
+          decision_timestamp, is_latest, created_at,
+          signature, signature_algorithm, payload_digest, signed_at
+        ) VALUES (?, ?, ?, ?, ?, 'bulk-revalidation', ?, ?, ?, '[]', ?, 'Brand Officer', 'APPROVED', ?, ?, 1, ?, ?, ?, ?, ?)
+      `).run(
+        passportId,
+        passportCode,
+        assetId,
+        asset.name,
+        newVersion,
+        govResult.status,
+        govResult.score,
+        claimsJson,
+        actorName,
+        reasonText,
+        now,
+        now,
+        sigResult.signature,
+        sigResult.signature_algorithm,
+        sigResult.payload_digest,
+        sigResult.signed_at
+      );
+
+      // Mark asset impacts as REVALIDATED
+      db.prepare(`
+        UPDATE change_impacts
+        SET alert_status = 'REVALIDATED', resolved_by = ?, resolved_at = ?
+        WHERE asset_id = ? AND alert_status = 'PENDING'
+      `).run(actorName, now, assetId);
+
+      revalidatedCount++;
+    }
+
+    logAuditEvent(
+      'BULK_REVALIDATION_EXECUTED',
+      actorName,
+      'Chief Brand Officer',
+      'CHANGE_IMPACT',
+      'BULK',
+      `Bulk revalidated ${revalidatedCount} asset(s) and resolved ${pendingImpacts.length} change impact alert(s). Rationale: ${reasonText}`
+    );
+
+    res.json({
+      success: true,
+      processed_assets: revalidatedCount,
+      resolved_impacts: pendingImpacts.length,
+      timestamp: now,
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -1518,81 +2233,142 @@ app.post('/api/demo/reset', (req, res) => {
   }
 });
 
-app.post('/api/evaluate', async (req, res) => {
+let latestEvaluationCache: any = null;
+
+app.get('/api/evaluate', async (req, res) => {
+  if (latestEvaluationCache) {
+    return res.json(latestEvaluationCache);
+  }
+  // If not yet run, execute it
   try {
-    const approvedFacts = db.prepare('SELECT * FROM facts WHERE is_current = 1').all() as unknown as Fact[];
-    const brandRules = db.prepare("SELECT * FROM brand_rules WHERE status = 'active'").all() as unknown as BrandRule[];
+    const result = await runFullBenchmarkEvaluation();
+    latestEvaluationCache = result;
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
-    // Standardized labeled benchmark test suite
-    const testCases = [
-      {
-        text: 'Acme Cloud Pro is priced at ₹999/month for all customers.',
-        expected: 'SUPPORTED',
-        category: 'pricing',
-      },
-      {
-        text: 'Sign up for Acme Cloud Pro for just ₹799/month today.',
-        expected: 'CONTRADICTED',
-        category: 'pricing',
-      },
-      {
-        text: 'Enterprise Cloud SLA guarantees 99.99% uptime availability.',
-        expected: 'SUPPORTED',
-        category: 'sla',
-      },
-      {
-        text: 'Our cloud uptime SLA is 99.5% for standard accounts.',
-        expected: 'CONTRADICTED',
-        category: 'sla',
-      },
-      {
-        text: 'Enjoy a risk-free 14 days trial before being billed.',
-        expected: 'SUPPORTED',
-        category: 'policy',
-      },
-      {
-        text: 'Enjoy a 30-day trial with all premium features.',
-        expected: 'CONTRADICTED',
-        category: 'policy',
-      },
-      {
-        text: 'Our platform is guaranteed 100% bug-free in all deployments.',
-        expected: 'CONTRADICTED',
-        category: 'rule_violation',
-      },
-      {
-        text: 'Acme Technologies was founded by former astronauts in Zurich.',
-        expected: 'UNVERIFIED',
-        category: 'unverified_claim',
-      },
-    ];
+async function runFullBenchmarkEvaluation() {
+  const startTime = Date.now();
+  const approvedFacts = db.prepare('SELECT * FROM facts WHERE is_current = 1').all() as unknown as Fact[];
+  const brandRules = db.prepare("SELECT * FROM brand_rules WHERE status = 'active'").all() as unknown as BrandRule[];
 
-    let correctCount = 0;
-    const results = [];
+  const confusionMatrix: Record<string, Record<string, number>> = {
+    SUPPORTED: { SUPPORTED: 0, CONTRADICTED: 0, UNVERIFIED: 0 },
+    CONTRADICTED: { SUPPORTED: 0, CONTRADICTED: 0, UNVERIFIED: 0 },
+    UNVERIFIED: { SUPPORTED: 0, CONTRADICTED: 0, UNVERIFIED: 0 },
+  };
 
-    for (const tc of testCases) {
-      const { findings } = await runEvidenceGuardVerification(tc.text, approvedFacts, brandRules);
-      const actual = findings[0]?.status || 'UNVERIFIED';
-      const isCorrect = actual === tc.expected;
-      if (isCorrect) correctCount++;
-      results.push({
-        claim: tc.text,
-        expected: tc.expected,
-        actual,
-        passed: isCorrect,
-        explanation: findings[0]?.explanation || '',
-      });
+  const categoryStats: Record<string, { total: number; passed: number }> = {};
+  let correctCount = 0;
+  const results = [];
+  let traceableCitationsCount = 0;
+  let falseAlertCount = 0; // Ground truth not contradicted, but predicted contradicted
+  let nonContradictedGroundTruthCount = 0;
+
+  for (const tc of EVALUATION_DATASET) {
+    if (!categoryStats[tc.category]) {
+      categoryStats[tc.category] = { total: 0, passed: 0 };
+    }
+    categoryStats[tc.category].total++;
+
+    const claimStatement = tc.text;
+    const { findings, engineUsed } = await runEvidenceGuardVerification(claimStatement, approvedFacts, brandRules);
+    const actual = findings[0]?.status || 'UNVERIFIED';
+    const explanation = findings[0]?.explanation || 'No matching fact found.';
+    const sourceRef = findings[0]?.matched_fact?.source_ref || (findings[0]?.matched_rule ? 'BRAND_RULE' : null);
+
+    const isCorrect = actual === tc.expected;
+    if (isCorrect) {
+      correctCount++;
+      categoryStats[tc.category].passed++;
     }
 
-    const accuracy = Math.round((correctCount / testCases.length) * 100);
+    if (confusionMatrix[tc.expected] && confusionMatrix[tc.expected][actual] !== undefined) {
+      confusionMatrix[tc.expected][actual]++;
+    }
 
-    res.json({
-      total_tests: testCases.length,
-      passed_tests: correctCount,
-      accuracy_percentage: accuracy,
-      results,
-      timestamp: new Date().toISOString(),
+    if (tc.expected !== 'CONTRADICTED') {
+      nonContradictedGroundTruthCount++;
+      if (actual === 'CONTRADICTED') {
+        falseAlertCount++;
+      }
+    }
+
+    if (sourceRef || actual === 'UNVERIFIED') {
+      traceableCitationsCount++;
+    }
+
+    results.push({
+      id: tc.id,
+      claim: claimStatement,
+      expected: tc.expected,
+      actual,
+      passed: isCorrect,
+      category: tc.category,
+      explanation,
+      source_ref: sourceRef,
+      engine_used: engineUsed,
     });
+  }
+
+  const durationMs = Date.now() - startTime;
+  const accuracy = Math.round((correctCount / EVALUATION_DATASET.length) * 1000) / 10;
+  const traceabilityRate = Math.round((traceableCitationsCount / EVALUATION_DATASET.length) * 1000) / 10;
+  const falseAlertRate =
+    nonContradictedGroundTruthCount > 0
+      ? Math.round((falseAlertCount / nonContradictedGroundTruthCount) * 1000) / 10
+      : 0;
+
+  // Compute Class Metrics (Precision, Recall, F1)
+  const classes = ['SUPPORTED', 'CONTRADICTED', 'UNVERIFIED'] as const;
+  const classMetrics: Record<string, { precision: number; recall: number; f1: number; support: number }> = {};
+
+  for (const cls of classes) {
+    const tp = confusionMatrix[cls][cls] || 0;
+    const fp = classes.filter((c) => c !== cls).reduce((sum, c) => sum + (confusionMatrix[c][cls] || 0), 0);
+    const fn = classes.filter((c) => c !== cls).reduce((sum, c) => sum + (confusionMatrix[cls][c] || 0), 0);
+    const precision = tp + fp > 0 ? tp / (tp + fp) : 1;
+    const recall = tp + fn > 0 ? tp / (tp + fn) : 1;
+    const f1 = precision + recall > 0 ? (2 * precision * recall) / (precision + recall) : 1;
+    const support = classes.reduce((sum, c) => sum + (confusionMatrix[cls][c] || 0), 0);
+
+    classMetrics[cls] = {
+      precision: Math.round(precision * 1000) / 10,
+      recall: Math.round(recall * 1000) / 10,
+      f1: Math.round(f1 * 1000) / 10,
+      support,
+    };
+  }
+
+  const macroF1 =
+    Math.round(((classMetrics.SUPPORTED.f1 + classMetrics.CONTRADICTED.f1 + classMetrics.UNVERIFIED.f1) / 3) * 10) / 10;
+
+  return {
+    dataset_version: 'v3.2.0-2026',
+    total_tests: EVALUATION_DATASET.length,
+    passed_tests: correctCount,
+    accuracy_percentage: accuracy,
+    macro_f1: macroF1,
+    traceability_rate: traceabilityRate,
+    false_alert_rate: falseAlertRate,
+    duration_ms: durationMs,
+    avg_latency_ms: Math.round((durationMs / EVALUATION_DATASET.length) * 10) / 10,
+    confusion_matrix: confusionMatrix,
+    class_metrics: classMetrics,
+    category_breakdown: categoryStats,
+    benchmark_targets: BENCHMARK_METRICS,
+    results,
+    timestamp: new Date().toISOString(),
+  };
+}
+
+app.post('/api/evaluate', async (req, res) => {
+  try {
+    const evaluation = await runFullBenchmarkEvaluation();
+    latestEvaluationCache = evaluation;
+    res.json(evaluation);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
