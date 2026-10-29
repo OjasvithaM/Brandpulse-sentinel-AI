@@ -38,6 +38,10 @@ export const LiveSourcesView: React.FC<LiveSourcesViewProps> = ({
   const [isSyncingAll, setIsSyncingAll] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [isTriggeringScheduler, setIsTriggeringScheduler] = useState(false);
+  const [schedulerResult, setSchedulerResult] = useState<any | null>(null);
+  const [syncHistory, setSyncHistory] = useState<any[]>([]);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   // Review decision modal state
   const [reviewingStaged, setReviewingStaged] = useState<StagedFactUpdate | null>(null);
@@ -56,6 +60,34 @@ export const LiveSourcesView: React.FC<LiveSourcesViewProps> = ({
 
   // Upstream Simulation state
   const [isSimulatingUpstream, setIsSimulatingUpstream] = useState(false);
+
+  const fetchSyncHistory = async () => {
+    try {
+      const res = await fetch('/api/live-sources/history');
+      if (res.ok) setSyncHistory(await res.json());
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleTriggerSchedulerSync = async () => {
+    setIsTriggeringScheduler(true);
+    try {
+      const res = await fetch('/api/scheduler/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      setSchedulerResult(data);
+      await fetchSourcesAndStaged();
+      await fetchSyncHistory();
+      onRefreshStats();
+    } catch (err: any) {
+      alert(err.message || 'Scheduler sync failed');
+    } finally {
+      setIsTriggeringScheduler(false);
+    }
+  };
 
   const fetchSourcesAndStaged = async () => {
     setIsLoading(true);
@@ -260,7 +292,27 @@ export const LiveSourcesView: React.FC<LiveSourcesViewProps> = ({
           </p>
         </div>
 
-        <div className="shrink-0 flex items-center space-x-2">
+        <div className="shrink-0 flex items-center space-x-2 flex-wrap gap-2">
+          <button
+            onClick={handleTriggerSchedulerSync}
+            disabled={isTriggeringScheduler}
+            className="px-3.5 py-2 rounded-md bg-cyan-600 hover:bg-cyan-500 text-slate-950 text-xs font-bold shadow-xs transition-colors flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
+            title="Trigger Cloud Scheduler cron endpoint (POST /api/scheduler/sync)"
+          >
+            <Clock className={`w-3.5 h-3.5 ${isTriggeringScheduler ? 'animate-spin' : ''}`} />
+            <span>{isTriggeringScheduler ? 'Invoking Cron...' : 'Cloud Scheduler Sync'}</span>
+          </button>
+          <button
+            onClick={() => {
+              fetchSyncHistory();
+              setShowHistoryModal(true);
+            }}
+            className="px-3 py-2 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-colors flex items-center space-x-1.5 cursor-pointer"
+            title="Inspect historical sync execution and latency logs"
+          >
+            <Activity className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Sync Telemetry Log</span>
+          </button>
           <button
             onClick={handleSyncAll}
             disabled={isSyncingAll}
@@ -796,6 +848,145 @@ export const LiveSourcesView: React.FC<LiveSourcesViewProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Cloud Scheduler Result Dialog */}
+      {schedulerResult && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0b1220] border border-cyan-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 text-slate-100">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center space-x-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                <h3 className="text-sm font-bold font-mono">
+                  Cloud Scheduler Execution Completed
+                </h3>
+              </div>
+              <button onClick={() => setSchedulerResult(null)} className="text-slate-400 hover:text-white cursor-pointer">
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300 bg-slate-900/80 p-3 rounded-lg border border-slate-800">
+              {schedulerResult.message}
+            </p>
+
+            <div className="bg-slate-950 p-3 rounded-lg border border-slate-800 font-mono text-[11px] space-y-1.5">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Cron Job ID:</span>
+                <span className="text-cyan-400 font-bold">{schedulerResult.job_id}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Run ID:</span>
+                <span className="text-slate-300">{schedulerResult.run_id}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Execution Status:</span>
+                <span className="text-emerald-400 font-bold">{schedulerResult.status}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Sources Synced:</span>
+                <span className="text-indigo-400 font-bold">{schedulerResult.synced_sources} active feed(s)</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Changes Flagged:</span>
+                <span className={schedulerResult.changed_facts > 0 ? 'text-amber-400 font-bold' : 'text-slate-400'}>
+                  {schedulerResult.changed_facts} material update(s)
+                </span>
+              </div>
+              <div className="flex justify-between border-t border-slate-800/80 pt-1.5">
+                <span className="text-slate-400">Next Scheduled Cron:</span>
+                <span className="text-slate-300">{new Date(schedulerResult.next_scheduled_at).toLocaleTimeString()}</span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setSchedulerResult(null)}
+              className="w-full py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold cursor-pointer"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Sync Telemetry History Modal */}
+      {showHistoryModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#0b1220] border border-cyan-800 rounded-2xl max-w-3xl w-full p-6 shadow-2xl space-y-4 max-h-[85vh] overflow-y-auto text-slate-100">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center space-x-2">
+                <Activity className="w-5 h-5 text-cyan-400" />
+                <h3 className="text-sm font-bold font-mono">
+                  Live Sources Ingestion Telemetry & Execution Runs
+                </h3>
+              </div>
+              <button onClick={() => setShowHistoryModal(false)} className="text-slate-400 hover:text-white cursor-pointer">
+                ✕
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs font-mono">
+                <thead>
+                  <tr className="border-b border-slate-800 text-slate-400 text-[10px] uppercase">
+                    <th className="p-2">Source ID</th>
+                    <th className="p-2">Status</th>
+                    <th className="p-2">HTTP</th>
+                    <th className="p-2">Latency</th>
+                    <th className="p-2">Payload Hash</th>
+                    <th className="p-2">Changed</th>
+                    <th className="p-2 text-right">Synced At</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 font-sans">
+                  {syncHistory.map((h: any) => (
+                    <tr key={h.id} className="hover:bg-slate-900/40">
+                      <td className="p-2 font-mono text-[11px] text-cyan-300">{h.source_id}</td>
+                      <td className="p-2">
+                        <span
+                          className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                            h.sync_status === 'SUCCESS' ? 'bg-emerald-950 text-emerald-400' : 'bg-rose-950 text-rose-400'
+                          }`}
+                        >
+                          {h.sync_status}
+                        </span>
+                      </td>
+                      <td className="p-2 font-mono text-[11px] text-slate-300">{h.http_status_code || 200}</td>
+                      <td className="p-2 font-mono text-[11px] text-amber-400">{h.response_time_ms}ms</td>
+                      <td className="p-2 font-mono text-[10px] text-slate-400 truncate max-w-[120px]" title={h.payload_hash}>
+                        {h.payload_hash?.substring(0, 10)}...
+                      </td>
+                      <td className="p-2 font-mono text-[11px]">
+                        <span className={h.facts_changed_count > 0 ? 'text-rose-400 font-bold' : 'text-slate-400'}>
+                          {h.facts_changed_count}
+                        </span>
+                      </td>
+                      <td className="p-2 text-right font-mono text-[10px] text-slate-400">
+                        {new Date(h.synced_at).toLocaleTimeString()}
+                      </td>
+                    </tr>
+                  ))}
+                  {syncHistory.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="p-6 text-center text-slate-400 text-xs">
+                        No historical sync runs logged yet. Click &ldquo;Cloud Scheduler Sync&rdquo; to initiate an ingestion run.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex justify-end pt-2 border-t border-slate-800">
+              <button
+                onClick={() => setShowHistoryModal(false)}
+                className="px-4 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

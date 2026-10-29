@@ -74,9 +74,32 @@ export default function App() {
     }
   };
 
+  // Sync active session persona on mount
   useEffect(() => {
+    fetch('/api/auth/me')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((user) => {
+        if (user && user.role) {
+          setUserRole(user.role);
+        }
+      })
+      .catch(() => {});
     loadAllData();
   }, []);
+
+  const handleSelectRole = async (newRole: UserRole) => {
+    setUserRole(newRole);
+    try {
+      await fetch('/api/auth/switch-demo-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: newRole }),
+      });
+      await loadAllData();
+    } catch (err) {
+      console.error('Failed to switch role persona:', err);
+    }
+  };
 
   // Demo Reset handler
   const handleResetDemo = async () => {
@@ -140,7 +163,7 @@ export default function App() {
         isResetting={isResetting}
         savedAuditsCount={savedAuditsCount}
         userRole={userRole}
-        onSelectRole={setUserRole}
+        onSelectRole={handleSelectRole}
       />
 
       {/* Sub-Navigation Bar */}

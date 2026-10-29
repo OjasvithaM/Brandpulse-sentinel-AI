@@ -1,0 +1,1644 @@
+{
+  "evaluation_id": "eval-1793284351165",
+  "evaluated_at": "2026-10-29T14:32:31.165Z",
+  "dataset_name": "BrandPulse Sentinel Governance Benchmark-154",
+  "dataset_version": "v3.2.0-2026",
+  "engine_version": "EvidenceGuard v3.2.0-deterministic",
+  "total_claims": 154,
+  "total_scenarios": 10,
+  "overall_accuracy": 79.9,
+  "macro_f1": 0.8,
+  "change_impact_recall": 100,
+  "false_alert_rate": 16.7,
+  "traceability_rate": 100,
+  "passport_completeness_rate": 100,
+  "confusion_matrix": {
+    "labels": [
+      "SUPPORTED",
+      "CONTRADICTED",
+      "UNVERIFIED"
+    ],
+    "matrix": [
+      [
+        35,
+        2,
+        15
+      ],
+      [
+        0,
+        48,
+        6
+      ],
+      [
+        0,
+        8,
+        40
+      ]
+    ]
+  },
+  "class_metrics": {
+    "SUPPORTED": {
+      "support": 52,
+      "true_positives": 35,
+      "false_positives": 0,
+      "false_negatives": 17,
+      "precision": 100,
+      "recall": 67.3,
+      "f1_score": 0.8
+    },
+    "CONTRADICTED": {
+      "support": 54,
+      "true_positives": 48,
+      "false_positives": 10,
+      "false_negatives": 6,
+      "precision": 82.8,
+      "recall": 88.9,
+      "f1_score": 0.86
+    },
+    "UNVERIFIED": {
+      "support": 48,
+      "true_positives": 40,
+      "false_positives": 21,
+      "false_negatives": 8,
+      "precision": 65.6,
+      "recall": 83.3,
+      "f1_score": 0.73
+    }
+  },
+  "change_scenarios_evaluated": 10,
+  "change_scenarios_passed": 10,
+  "detailed_findings": [
+    {
+      "id": "tc-sup-001",
+      "claim": "Acme Cloud Pro is priced at ₹999/month for all customers.",
+      "expected": "SUPPORTED",
+      "predicted": "SUPPORTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-PRICING-V2",
+      "matched_fact": "Acme Cloud Pro Monthly Subscription",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Supported by approved fact \"Acme Cloud Pro Monthly Subscription\" (v1). Value ₹999 matches approved ₹999."
+    },
+    {
+      "id": "tc-sup-002",
+      "claim": "Subscribe to Acme Cloud Pro for ₹999/month and get started immediately.",
+      "expected": "SUPPORTED",
+      "predicted": "SUPPORTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-PRICING-V2",
+      "matched_fact": "Acme Cloud Pro Monthly Subscription",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Supported by approved fact \"Acme Cloud Pro Monthly Subscription\" (v1). Value ₹999 matches approved ₹999."
+    },
+    {
+      "id": "tc-sup-003",
+      "claim": "The standard subscription fee for Acme Cloud Pro is ₹999 per month.",
+      "expected": "SUPPORTED",
+      "predicted": "SUPPORTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-PRICING-V2",
+      "matched_fact": "Acme Cloud Pro Monthly Subscription",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Supported by approved fact \"Acme Cloud Pro Monthly Subscription\" (v1). Value ₹999 matches approved ₹999."
+    },
+    {
+      "id": "tc-sup-004",
+      "claim": "Monthly pricing for Acme Cloud Pro tier is ₹999/month billed on renewal.",
+      "expected": "SUPPORTED",
+      "predicted": "SUPPORTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-PRICING-V2",
+      "matched_fact": "Acme Cloud Pro Monthly Subscription",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Supported by approved fact \"Acme Cloud Pro Monthly Subscription\" (v1). Value ₹999 matches approved ₹999."
+    },
+    {
+      "id": "tc-sup-005",
+      "claim": "Teams can access Acme Cloud Pro for ₹999/month with full core module access.",
+      "expected": "SUPPORTED",
+      "predicted": "SUPPORTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-PRICING-V2",
+      "matched_fact": "Acme Cloud Pro Monthly Subscription",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Supported by approved fact \"Acme Cloud Pro Monthly Subscription\" (v1). Value ₹999 matches approved ₹999."
+    },
+    {
+      "id": "tc-sup-006",
+      "claim": "Enterprise Cloud SLA guarantees 99.99% uptime availability.",
+      "expected": "SUPPORTED",
+      "predicted": "SUPPORTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-SLA-V1",
+      "matched_fact": "Enterprise Cloud SLA Guarantee",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Supported by approved fact \"Enterprise Cloud SLA Guarantee\" (v1). Value 99.99% matches approved 99.99%."
+    },
+    {
+      "id": "tc-sup-007",
+      "claim": "We deliver 99.99% uptime availability for all enterprise deployments.",
+      "expected": "SUPPORTED",
+      "predicted": "SUPPORTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-SLA-V1",
+      "matched_fact": "Enterprise Cloud SLA Guarantee",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Supported by approved fact \"Enterprise Cloud SLA Guarantee\" (v1). Value 99.99% matches approved 99.99%."
+    },
+    {
+      "id": "tc-sup-008",
+      "claim": "Enterprise Cloud SLA provides a 99.99% availability commitment.",
+      "expected": "SUPPORTED",
+      "predicted": "SUPPORTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-SLA-V1",
+      "matched_fact": "Enterprise Cloud SLA Guarantee",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Supported by approved fact \"Enterprise Cloud SLA Guarantee\" (v1). Value 99.99% matches approved 99.99%."
+    },
+    {
+      "id": "tc-sup-009",
+      "claim": "High-availability infrastructure backed by our Enterprise Cloud SLA at 99.99% uptime.",
+      "expected": "SUPPORTED",
+      "predicted": "SUPPORTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-SLA-V1",
+      "matched_fact": "Enterprise Cloud SLA Guarantee",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Supported by approved fact \"Enterprise Cloud SLA Guarantee\" (v1). Value 99.99% matches approved 99.99%."
+    },
+    {
+      "id": "tc-sup-0010",
+      "claim": "Our monthly Enterprise Cloud SLA commitment guarantees 99.99% uptime availability.",
+      "expected": "SUPPORTED",
+      "predicted": "SUPPORTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-SLA-V1",
+      "matched_fact": "Enterprise Cloud SLA Guarantee",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Supported by approved fact \"Enterprise Cloud SLA Guarantee\" (v1). Value 99.99% matches approved 99.99%."
+    },
+    {
+      "id": "tc-sup-011",
+      "claim": "Enjoy a risk-free 14 days trial before being billed.",
+      "expected": "SUPPORTED",
+      "predicted": "SUPPORTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-TERMS-2026",
+      "matched_fact": "Standard Evaluation Trial Period",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Supported by approved fact \"Standard Evaluation Trial Period\" (v1). Value 14 days matches approved 14 days."
+    },
+    {
+      "id": "tc-sup-012",
+      "claim": "Sign up for our standard 14 days trial without providing credit card details.",
+      "expected": "SUPPORTED",
+      "predicted": "SUPPORTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-TERMS-2026",
+      "matched_fact": "Standard Evaluation Trial Period",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Supported by approved fact \"Standard Evaluation Trial Period\" (v1). Value 14 days matches approved 14 days."
+    },
+    {
+      "id": "tc-sup-013",
+      "claim": "Test drive every feature during the 14 days trial window.",
+      "expected": "SUPPORTED",
+      "predicted": "SUPPORTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-TERMS-2026",
+      "matched_fact": "Standard Evaluation Trial Period",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Supported by approved fact \"Standard Evaluation Trial Period\" (v1). Value 14 days matches approved 14 days."
+    },
+    {
+      "id": "tc-sup-014",
+      "claim": "The standard evaluation period is 14 days for new organization accounts.",
+      "expected": "SUPPORTED",
+      "predicted": "SUPPORTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-TERMS-2026",
+      "matched_fact": "Standard Evaluation Trial Period",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Supported by approved fact \"Standard Evaluation Trial Period\" (v1). Value 14 days matches approved 14 days."
+    },
+    {
+      "id": "tc-sup-015",
+      "claim": "Customer data is securely hosted in Mumbai, India and Frankfurt, Germany.",
+      "expected": "SUPPORTED",
+      "predicted": "UNVERIFIED",
+      "is_correct": false,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-sup-016",
+      "claim": "Acme provides data residency guarantees across Mumbai, India and Frankfurt, Germany.",
+      "expected": "SUPPORTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": false,
+      "evidence_ref": "DOC-2026-SEC-DATA",
+      "matched_fact": "Primary Cloud Data Residency",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Topic relates to \"Primary Cloud Data Residency\", but the stated claim does not reflect the approved value \"Mumbai & Frankfurt Regions\"."
+    },
+    {
+      "id": "tc-sup-017",
+      "claim": "Our storage infrastructure maintains dual residency in Mumbai, India and Frankfurt, Germany.",
+      "expected": "SUPPORTED",
+      "predicted": "UNVERIFIED",
+      "is_correct": false,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-sup-018",
+      "claim": "Acme Technologies has achieved SOC 2 Type II and ISO 27001 certifications.",
+      "expected": "SUPPORTED",
+      "predicted": "UNVERIFIED",
+      "is_correct": false,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-sup-019",
+      "claim": "Verified compliance through annual SOC 2 Type II and ISO 27001 audits.",
+      "expected": "SUPPORTED",
+      "predicted": "UNVERIFIED",
+      "is_correct": false,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-sup-020",
+      "claim": "Enterprise tier customers receive 24/7 dedicated support via telephone and Slack.",
+      "expected": "SUPPORTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": false,
+      "evidence_ref": "DOC-2026-SLA-V1",
+      "matched_fact": "Enterprise Cloud SLA Guarantee",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Topic relates to \"Enterprise Cloud SLA Guarantee\", but the stated claim does not reflect the approved value \"99.99%\"."
+    },
+    {
+      "id": "tc-sup-021",
+      "claim": "Get 24/7 dedicated support with a guaranteed 15-minute critical incident response.",
+      "expected": "SUPPORTED",
+      "predicted": "UNVERIFIED",
+      "is_correct": false,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-sup-022",
+      "claim": "Dedicated technical account managers provide 24/7 dedicated support for mission-critical workloads.",
+      "expected": "SUPPORTED",
+      "predicted": "UNVERIFIED",
+      "is_correct": false,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-sup-023",
+      "claim": "Our cloud catalog lists Acme Cloud Pro at ₹999/month for all standard subscriptions.",
+      "expected": "SUPPORTED",
+      "predicted": "SUPPORTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-PRICING-V2",
+      "matched_fact": "Acme Cloud Pro Monthly Subscription",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Supported by approved fact \"Acme Cloud Pro Monthly Subscription\" (v1). Value ₹999 matches approved ₹999."
+    },
+    {
+      "id": "tc-sup-024",
+      "claim": "Organizations subscribe at ₹999/month for Acme Cloud Pro.",
+      "expected": "SUPPORTED",
+      "predicted": "SUPPORTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-PRICING-V2",
+      "matched_fact": "Acme Cloud Pro Monthly Subscription",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Supported by approved fact \"Acme Cloud Pro Monthly Subscription\" (v1). Value ₹999 matches approved ₹999."
+    },
+    {
+      "id": "tc-sup-025",
+      "claim": "The recurring subscription for Acme Cloud Pro is strictly ₹999/month.",
+      "expected": "SUPPORTED",
+      "predicted": "SUPPORTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-PRICING-V2",
+      "matched_fact": "Acme Cloud Pro Monthly Subscription",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Supported by approved fact \"Acme Cloud Pro Monthly Subscription\" (v1). Value ₹999 matches approved ₹999."
+    },
+    {
+      "id": "tc-sup-026",
+      "claim": "Enterprise infrastructure operates under a 99.99% uptime availability contract.",
+      "expected": "SUPPORTED",
+      "predicted": "SUPPORTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-SLA-V1",
+      "matched_fact": "Enterprise Cloud SLA Guarantee",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Supported by approved fact \"Enterprise Cloud SLA Guarantee\" (v1). Value 99.99% matches approved 99.99%."
+    },
+    {
+      "id": "tc-sup-027",
+      "claim": "Availability service level for Acme Enterprise Cloud guarantees 99.99% uptime availability.",
+      "expected": "SUPPORTED",
+      "predicted": "SUPPORTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-SLA-V1",
+      "matched_fact": "Enterprise Cloud SLA Guarantee",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Supported by approved fact \"Enterprise Cloud SLA Guarantee\" (v1). Value 99.99% matches approved 99.99%."
+    },
+    {
+      "id": "tc-sup-028",
+      "claim": "We deliver high reliability backed by a 99.99% uptime availability SLA.",
+      "expected": "SUPPORTED",
+      "predicted": "SUPPORTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-SLA-V1",
+      "matched_fact": "Enterprise Cloud SLA Guarantee",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Supported by approved fact \"Enterprise Cloud SLA Guarantee\" (v1). Value 99.99% matches approved 99.99%."
+    },
+    {
+      "id": "tc-sup-029",
+      "claim": "New signups start with a 14 days trial without obligation.",
+      "expected": "SUPPORTED",
+      "predicted": "SUPPORTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-TERMS-2026",
+      "matched_fact": "Standard Evaluation Trial Period",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Supported by approved fact \"Standard Evaluation Trial Period\" (v1). Value 14 days matches approved 14 days."
+    },
+    {
+      "id": "tc-sup-030",
+      "claim": "Evaluate platform capabilities during our standard 14 days trial period.",
+      "expected": "SUPPORTED",
+      "predicted": "SUPPORTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-TERMS-2026",
+      "matched_fact": "Standard Evaluation Trial Period",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Supported by approved fact \"Standard Evaluation Trial Period\" (v1). Value 14 days matches approved 14 days."
+    },
+    {
+      "id": "tc-sup-031",
+      "claim": "Data centres located in Mumbai, India and Frankfurt, Germany safeguard all tenant data.",
+      "expected": "SUPPORTED",
+      "predicted": "UNVERIFIED",
+      "is_correct": false,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-sup-032",
+      "claim": "We guarantee full compliance with SOC 2 Type II and ISO 27001 standards.",
+      "expected": "SUPPORTED",
+      "predicted": "UNVERIFIED",
+      "is_correct": false,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-sup-033",
+      "claim": "Critical issues are supported by 24/7 dedicated support engineers around the clock.",
+      "expected": "SUPPORTED",
+      "predicted": "UNVERIFIED",
+      "is_correct": false,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-sup-034",
+      "claim": "Pay only ₹999/month for Acme Cloud Pro with zero hidden implementation charges.",
+      "expected": "SUPPORTED",
+      "predicted": "SUPPORTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-PRICING-V2",
+      "matched_fact": "Acme Cloud Pro Monthly Subscription",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Supported by approved fact \"Acme Cloud Pro Monthly Subscription\" (v1). Value ₹999 matches approved ₹999."
+    },
+    {
+      "id": "tc-sup-035",
+      "claim": "The approved license cost for Acme Cloud Pro is ₹999/month per workspace.",
+      "expected": "SUPPORTED",
+      "predicted": "SUPPORTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-PRICING-V2",
+      "matched_fact": "Acme Cloud Pro Monthly Subscription",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Supported by approved fact \"Acme Cloud Pro Monthly Subscription\" (v1). Value ₹999 matches approved ₹999."
+    },
+    {
+      "id": "tc-sup-036",
+      "claim": "Our Enterprise Cloud SLA promises 99.99% uptime availability across all clusters.",
+      "expected": "SUPPORTED",
+      "predicted": "SUPPORTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-SLA-V1",
+      "matched_fact": "Enterprise Cloud SLA Guarantee",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Supported by approved fact \"Enterprise Cloud SLA Guarantee\" (v1). Value 99.99% matches approved 99.99%."
+    },
+    {
+      "id": "tc-sup-037",
+      "claim": "Every enterprise cluster is certified under a 99.99% uptime availability contract.",
+      "expected": "SUPPORTED",
+      "predicted": "SUPPORTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-SLA-V1",
+      "matched_fact": "Enterprise Cloud SLA Guarantee",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Supported by approved fact \"Enterprise Cloud SLA Guarantee\" (v1). Value 99.99% matches approved 99.99%."
+    },
+    {
+      "id": "tc-sup-038",
+      "claim": "Begin evaluation today with our standard 14 days trial policy.",
+      "expected": "SUPPORTED",
+      "predicted": "SUPPORTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-TERMS-2026",
+      "matched_fact": "Standard Evaluation Trial Period",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Supported by approved fact \"Standard Evaluation Trial Period\" (v1). Value 14 days matches approved 14 days."
+    },
+    {
+      "id": "tc-sup-039",
+      "claim": "Customers enjoy a 14 days trial with all administrative features unlocked.",
+      "expected": "SUPPORTED",
+      "predicted": "SUPPORTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-TERMS-2026",
+      "matched_fact": "Standard Evaluation Trial Period",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Supported by approved fact \"Standard Evaluation Trial Period\" (v1). Value 14 days matches approved 14 days."
+    },
+    {
+      "id": "tc-sup-040",
+      "claim": "Your databases reside exclusively in Mumbai, India and Frankfurt, Germany.",
+      "expected": "SUPPORTED",
+      "predicted": "UNVERIFIED",
+      "is_correct": false,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-sup-041",
+      "claim": "Enterprise customers benefit from 24/7 dedicated support with rapid incident escalation.",
+      "expected": "SUPPORTED",
+      "predicted": "UNVERIFIED",
+      "is_correct": false,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-sup-042",
+      "claim": "Acme Cloud Pro is available for ₹999/month with automated daily backup snapshotting.",
+      "expected": "SUPPORTED",
+      "predicted": "SUPPORTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-PRICING-V2",
+      "matched_fact": "Acme Cloud Pro Monthly Subscription",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Supported by approved fact \"Acme Cloud Pro Monthly Subscription\" (v1). Value ₹999 matches approved ₹999."
+    },
+    {
+      "id": "tc-sup-043",
+      "claim": "Experience 99.99% uptime availability backed by service credit remediation.",
+      "expected": "SUPPORTED",
+      "predicted": "SUPPORTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-SLA-V1",
+      "matched_fact": "Enterprise Cloud SLA Guarantee",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Supported by approved fact \"Enterprise Cloud SLA Guarantee\" (v1). Value 99.99% matches approved 99.99%."
+    },
+    {
+      "id": "tc-sup-044",
+      "claim": "The risk-free evaluation period spans 14 days from initial registration.",
+      "expected": "SUPPORTED",
+      "predicted": "SUPPORTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-TERMS-2026",
+      "matched_fact": "Standard Evaluation Trial Period",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Supported by approved fact \"Standard Evaluation Trial Period\" (v1). Value 14 days matches approved 14 days."
+    },
+    {
+      "id": "tc-sup-045",
+      "claim": "Certified security infrastructure compliant with SOC 2 Type II and ISO 27001 guidelines.",
+      "expected": "SUPPORTED",
+      "predicted": "UNVERIFIED",
+      "is_correct": false,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-sup-046",
+      "claim": "All Acme Cloud Pro licenses are billed at ₹999/month.",
+      "expected": "SUPPORTED",
+      "predicted": "SUPPORTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-PRICING-V2",
+      "matched_fact": "Acme Cloud Pro Monthly Subscription",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Supported by approved fact \"Acme Cloud Pro Monthly Subscription\" (v1). Value ₹999 matches approved ₹999."
+    },
+    {
+      "id": "tc-sup-047",
+      "claim": "We deliver resilient multi-region infrastructure with 99.99% uptime availability.",
+      "expected": "SUPPORTED",
+      "predicted": "SUPPORTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-SLA-V1",
+      "matched_fact": "Enterprise Cloud SLA Guarantee",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Supported by approved fact \"Enterprise Cloud SLA Guarantee\" (v1). Value 99.99% matches approved 99.99%."
+    },
+    {
+      "id": "tc-sup-048",
+      "claim": "A risk-free 14 days trial is offered to all new prospective business clients.",
+      "expected": "SUPPORTED",
+      "predicted": "SUPPORTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-TERMS-2026",
+      "matched_fact": "Standard Evaluation Trial Period",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Supported by approved fact \"Standard Evaluation Trial Period\" (v1). Value 14 days matches approved 14 days."
+    },
+    {
+      "id": "tc-sup-049",
+      "claim": "Regional cloud availability regions include Mumbai, India and Frankfurt, Germany.",
+      "expected": "SUPPORTED",
+      "predicted": "UNVERIFIED",
+      "is_correct": false,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-sup-050",
+      "claim": "Acme maintains active certifications for SOC 2 Type II and ISO 27001 compliance.",
+      "expected": "SUPPORTED",
+      "predicted": "UNVERIFIED",
+      "is_correct": false,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-sup-051",
+      "claim": "Subscribers can rely on 24/7 dedicated support across all tier-one production deployments.",
+      "expected": "SUPPORTED",
+      "predicted": "UNVERIFIED",
+      "is_correct": false,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-sup-052",
+      "claim": "Get Acme Cloud Pro for ₹999/month with enterprise analytics tools.",
+      "expected": "SUPPORTED",
+      "predicted": "SUPPORTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-PRICING-V2",
+      "matched_fact": "Acme Cloud Pro Monthly Subscription",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Supported by approved fact \"Acme Cloud Pro Monthly Subscription\" (v1). Value ₹999 matches approved ₹999."
+    },
+    {
+      "id": "tc-con-001",
+      "claim": "Sign up for Acme Cloud Pro for just ₹799/month today.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-PRICING-V2",
+      "matched_fact": "Acme Cloud Pro Monthly Subscription",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Discrepancy detected with approved fact \"Acme Cloud Pro Monthly Subscription\" (v1). Claim states ₹799, but approved fact is ₹999/month per source DOC-2026-PRICING-V2."
+    },
+    {
+      "id": "tc-con-002",
+      "claim": "Acme Cloud Pro is currently priced at ₹899/month on promotion.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-PRICING-V2",
+      "matched_fact": "Acme Cloud Pro Monthly Subscription",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Discrepancy detected with approved fact \"Acme Cloud Pro Monthly Subscription\" (v1). Claim states ₹899, but approved fact is ₹999/month per source DOC-2026-PRICING-V2."
+    },
+    {
+      "id": "tc-con-003",
+      "claim": "Get Acme Cloud Pro for ₹1,199/month without any discount.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-PRICING-V2",
+      "matched_fact": "Acme Cloud Pro Monthly Subscription",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Discrepancy detected with approved fact \"Acme Cloud Pro Monthly Subscription\" (v1). Claim states ₹1, but approved fact is ₹999/month per source DOC-2026-PRICING-V2."
+    },
+    {
+      "id": "tc-con-004",
+      "claim": "Our discounted promotional rate for Acme Cloud Pro is ₹499/month.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-PRICING-V2",
+      "matched_fact": "Acme Cloud Pro Monthly Subscription",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Discrepancy detected with approved fact \"Acme Cloud Pro Monthly Subscription\" (v1). Claim states ₹499, but approved fact is ₹999/month per source DOC-2026-PRICING-V2."
+    },
+    {
+      "id": "tc-con-005",
+      "claim": "Acme Cloud Pro subscriptions cost ₹1,299/month for early bird subscribers.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-PRICING-V2",
+      "matched_fact": "Acme Cloud Pro Monthly Subscription",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Discrepancy detected with approved fact \"Acme Cloud Pro Monthly Subscription\" (v1). Claim states ₹1, but approved fact is ₹999/month per source DOC-2026-PRICING-V2."
+    },
+    {
+      "id": "tc-con-006",
+      "claim": "Our cloud uptime SLA is 99.5% for standard accounts.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-SLA-V1",
+      "matched_fact": "Enterprise Cloud SLA Guarantee",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Discrepancy detected with approved fact \"Enterprise Cloud SLA Guarantee\" (v1). Claim states 99.5%, but approved fact is 99.99% per source DOC-2026-SLA-V1."
+    },
+    {
+      "id": "tc-con-007",
+      "claim": "Enterprise Cloud SLA guarantees 99.9% uptime availability for all users.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-SLA-V1",
+      "matched_fact": "Enterprise Cloud SLA Guarantee",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Discrepancy detected with approved fact \"Enterprise Cloud SLA Guarantee\" (v1). Claim states 99.9%, but approved fact is 99.99% per source DOC-2026-SLA-V1."
+    },
+    {
+      "id": "tc-con-008",
+      "claim": "We provide a 99.0% uptime SLA guarantee on standard servers.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-SLA-V1",
+      "matched_fact": "Enterprise Cloud SLA Guarantee",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Discrepancy detected with approved fact \"Enterprise Cloud SLA Guarantee\" (v1). Claim states 99.0%, but approved fact is 99.99% per source DOC-2026-SLA-V1."
+    },
+    {
+      "id": "tc-con-009",
+      "claim": "Our infrastructure offers a 98.5% uptime commitment.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-SLA-V1",
+      "matched_fact": "Enterprise Cloud SLA Guarantee",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Discrepancy detected with approved fact \"Enterprise Cloud SLA Guarantee\" (v1). Claim states 98.5%, but approved fact is 99.99% per source DOC-2026-SLA-V1."
+    },
+    {
+      "id": "tc-con-010",
+      "claim": "Enterprise Cloud SLA commits to 99.8% uptime reliability.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-SLA-V1",
+      "matched_fact": "Enterprise Cloud SLA Guarantee",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Discrepancy detected with approved fact \"Enterprise Cloud SLA Guarantee\" (v1). Claim states 99.8%, but approved fact is 99.99% per source DOC-2026-SLA-V1."
+    },
+    {
+      "id": "tc-con-011",
+      "claim": "Enjoy a 30-day trial with all premium features.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-TERMS-2026",
+      "matched_fact": "Standard Evaluation Trial Period",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Discrepancy detected with approved fact \"Standard Evaluation Trial Period\" (v1). Claim states 30-day, but approved fact is 14 days per source DOC-TERMS-2026."
+    },
+    {
+      "id": "tc-con-012",
+      "claim": "Get an extended 30 days trial when registering this quarter.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-TERMS-2026",
+      "matched_fact": "Standard Evaluation Trial Period",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Discrepancy detected with approved fact \"Standard Evaluation Trial Period\" (v1). Claim states 30 days, but approved fact is 14 days per source DOC-TERMS-2026."
+    },
+    {
+      "id": "tc-con-013",
+      "claim": "Sign up today and receive a 60-day trial free of cost.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-TERMS-2026",
+      "matched_fact": "Standard Evaluation Trial Period",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Discrepancy detected with approved fact \"Standard Evaluation Trial Period\" (v1). Claim states 60-day, but approved fact is 14 days per source DOC-TERMS-2026."
+    },
+    {
+      "id": "tc-con-014",
+      "claim": "Our standard evaluation trial period is only 7 days.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-TERMS-2026",
+      "matched_fact": "Standard Evaluation Trial Period",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Discrepancy detected with approved fact \"Standard Evaluation Trial Period\" (v1). Claim states 7 days, but approved fact is 14 days per source DOC-TERMS-2026."
+    },
+    {
+      "id": "tc-con-015",
+      "claim": "Test drive the application with our 21 days trial program.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-TERMS-2026",
+      "matched_fact": "Standard Evaluation Trial Period",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Discrepancy detected with approved fact \"Standard Evaluation Trial Period\" (v1). Claim states 21 days, but approved fact is 14 days per source DOC-TERMS-2026."
+    },
+    {
+      "id": "tc-con-016",
+      "claim": "Our platform is guaranteed 100% bug-free in all deployments.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "BRAND_RULE_POLICIES",
+      "matched_fact": "Prohibition of Absolute Software Claims",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Violation of brand rule [BR-NO-ABSOLUTE-CLAIMS]: \"100% bug-free\" is a prohibited or misleading term (Legal policy forbids asserting that software or infrastructure is 100% bug-free, unhackable, or completely infallible.)."
+    },
+    {
+      "id": "tc-con-017",
+      "claim": "We guarantee that our software code is 100% bug-free under all conditions.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "BRAND_RULE_POLICIES",
+      "matched_fact": "Prohibition of Absolute Software Claims",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Violation of brand rule [BR-NO-ABSOLUTE-CLAIMS]: \"100% bug-free\" is a prohibited or misleading term (Legal policy forbids asserting that software or infrastructure is 100% bug-free, unhackable, or completely infallible.)."
+    },
+    {
+      "id": "tc-con-018",
+      "claim": "Deploy onto completely 100% bug-free microservices architecture.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "BRAND_RULE_POLICIES",
+      "matched_fact": "Prohibition of Absolute Software Claims",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Violation of brand rule [BR-NO-ABSOLUTE-CLAIMS]: \"100% bug-free\" is a prohibited or misleading term (Legal policy forbids asserting that software or infrastructure is 100% bug-free, unhackable, or completely infallible.)."
+    },
+    {
+      "id": "tc-con-019",
+      "claim": "Our engineers have delivered a 100% bug-free system.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "BRAND_RULE_POLICIES",
+      "matched_fact": "Prohibition of Absolute Software Claims",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Violation of brand rule [BR-NO-ABSOLUTE-CLAIMS]: \"100% bug-free\" is a prohibited or misleading term (Legal policy forbids asserting that software or infrastructure is 100% bug-free, unhackable, or completely infallible.)."
+    },
+    {
+      "id": "tc-con-020",
+      "claim": "Sign up now for unlimited free forever cloud storage.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "BRAND_RULE_POLICIES",
+      "matched_fact": "No Unauthorized Lifetime Discount Phrases",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Violation of brand rule [BR-UNAUTHORIZED-PRICING]: \"unlimited free forever\" is a prohibited or misleading term (Commercial guidelines prohibit unauthorized lifetime free claims without executive approval.)."
+    },
+    {
+      "id": "tc-con-021",
+      "claim": "Get an exclusive plan with unlimited free forever compute credits.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "BRAND_RULE_POLICIES",
+      "matched_fact": "No Unauthorized Lifetime Discount Phrases",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Violation of brand rule [BR-UNAUTHORIZED-PRICING]: \"unlimited free forever\" is a prohibited or misleading term (Commercial guidelines prohibit unauthorized lifetime free claims without executive approval.)."
+    },
+    {
+      "id": "tc-con-022",
+      "claim": "Acme Cloud Pro is offered as unlimited free forever for non-profits.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "BRAND_RULE_POLICIES",
+      "matched_fact": "No Unauthorized Lifetime Discount Phrases",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Violation of brand rule [BR-UNAUTHORIZED-PRICING]: \"unlimited free forever\" is a prohibited or misleading term (Commercial guidelines prohibit unauthorized lifetime free claims without executive approval.)."
+    },
+    {
+      "id": "tc-con-023",
+      "claim": "Acme Cloud Pro is priced at ₹699/month for early bird subscribers.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-PRICING-V2",
+      "matched_fact": "Acme Cloud Pro Monthly Subscription",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Discrepancy detected with approved fact \"Acme Cloud Pro Monthly Subscription\" (v1). Claim states ₹699, but approved fact is ₹999/month per source DOC-2026-PRICING-V2."
+    },
+    {
+      "id": "tc-con-024",
+      "claim": "Annual pricing calculates to ₹599/month for all customers.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-PRICING-V2",
+      "matched_fact": "Acme Cloud Pro Monthly Subscription",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Discrepancy detected with approved fact \"Acme Cloud Pro Monthly Subscription\" (v1). Claim states ₹599, but approved fact is ₹999/month per source DOC-2026-PRICING-V2."
+    },
+    {
+      "id": "tc-con-025",
+      "claim": "Pay only ₹850/month for our Acme Cloud Pro monthly tier.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-PRICING-V2",
+      "matched_fact": "Acme Cloud Pro Monthly Subscription",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Discrepancy detected with approved fact \"Acme Cloud Pro Monthly Subscription\" (v1). Claim states ₹850, but approved fact is ₹999/month per source DOC-2026-PRICING-V2."
+    },
+    {
+      "id": "tc-con-026",
+      "claim": "Enterprise Cloud SLA guarantees 99.50% uptime availability.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-SLA-V1",
+      "matched_fact": "Enterprise Cloud SLA Guarantee",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Discrepancy detected with approved fact \"Enterprise Cloud SLA Guarantee\" (v1). Claim states 99.50%, but approved fact is 99.99% per source DOC-2026-SLA-V1."
+    },
+    {
+      "id": "tc-con-027",
+      "claim": "We commit to 95.0% uptime availability for our entry cluster tier.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-SLA-V1",
+      "matched_fact": "Enterprise Cloud SLA Guarantee",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Discrepancy detected with approved fact \"Enterprise Cloud SLA Guarantee\" (v1). Claim states 95.0%, but approved fact is 99.99% per source DOC-2026-SLA-V1."
+    },
+    {
+      "id": "tc-con-028",
+      "claim": "The evaluation period includes a 45 days trial window.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-TERMS-2026",
+      "matched_fact": "Standard Evaluation Trial Period",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Discrepancy detected with approved fact \"Standard Evaluation Trial Period\" (v1). Claim states 45 days, but approved fact is 14 days per source DOC-TERMS-2026."
+    },
+    {
+      "id": "tc-con-029",
+      "claim": "Start your test evaluation with our 3-week trial period.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-TERMS-2026",
+      "matched_fact": "Standard Evaluation Trial Period",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Topic relates to \"Standard Evaluation Trial Period\", but the stated claim does not reflect the approved value \"14 days\"."
+    },
+    {
+      "id": "tc-con-030",
+      "claim": "Acme promises that our container runtime is 100% bug-free.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "BRAND_RULE_POLICIES",
+      "matched_fact": "Prohibition of Absolute Software Claims",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Violation of brand rule [BR-NO-ABSOLUTE-CLAIMS]: \"100% bug-free\" is a prohibited or misleading term (Legal policy forbids asserting that software or infrastructure is 100% bug-free, unhackable, or completely infallible.)."
+    },
+    {
+      "id": "tc-con-031",
+      "claim": "Receive lifetime licenses that are unlimited free forever with no limits.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "BRAND_RULE_POLICIES",
+      "matched_fact": "No Unauthorized Lifetime Discount Phrases",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Violation of brand rule [BR-UNAUTHORIZED-PRICING]: \"unlimited free forever\" is a prohibited or misleading term (Commercial guidelines prohibit unauthorized lifetime free claims without executive approval.)."
+    },
+    {
+      "id": "tc-con-032",
+      "claim": "Customer data is hosted exclusively in Tokyo, Japan and Sydney, Australia.",
+      "expected": "CONTRADICTED",
+      "predicted": "UNVERIFIED",
+      "is_correct": false,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-con-033",
+      "claim": "All database records reside only in New York, United States.",
+      "expected": "CONTRADICTED",
+      "predicted": "UNVERIFIED",
+      "is_correct": false,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-con-034",
+      "claim": "Acme operates data residency exclusively inside London, United Kingdom.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-SEC-DATA",
+      "matched_fact": "Primary Cloud Data Residency",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Topic relates to \"Primary Cloud Data Residency\", but the stated claim does not reflect the approved value \"Mumbai & Frankfurt Regions\"."
+    },
+    {
+      "id": "tc-con-035",
+      "claim": "We are certified under PCI-DSS Level 4 and FedRAMP Moderate only.",
+      "expected": "CONTRADICTED",
+      "predicted": "UNVERIFIED",
+      "is_correct": false,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-con-036",
+      "claim": "Support response is limited to 9am-5pm business hours Monday to Friday.",
+      "expected": "CONTRADICTED",
+      "predicted": "UNVERIFIED",
+      "is_correct": false,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-con-037",
+      "claim": "Enterprise tier customers receive 8x5 standard email support only.",
+      "expected": "CONTRADICTED",
+      "predicted": "UNVERIFIED",
+      "is_correct": false,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-con-038",
+      "claim": "Acme Cloud Pro is priced at ₹1,099/month on our website.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-PRICING-V2",
+      "matched_fact": "Acme Cloud Pro Monthly Subscription",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Discrepancy detected with approved fact \"Acme Cloud Pro Monthly Subscription\" (v1). Claim states ₹1, but approved fact is ₹999/month per source DOC-2026-PRICING-V2."
+    },
+    {
+      "id": "tc-con-039",
+      "claim": "Our monthly fee is discounted to ₹750/month across retail accounts.",
+      "expected": "CONTRADICTED",
+      "predicted": "UNVERIFIED",
+      "is_correct": false,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-con-040",
+      "claim": "Our Enterprise Cloud SLA promises 99.7% uptime availability.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-SLA-V1",
+      "matched_fact": "Enterprise Cloud SLA Guarantee",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Discrepancy detected with approved fact \"Enterprise Cloud SLA Guarantee\" (v1). Claim states 99.7%, but approved fact is 99.99% per source DOC-2026-SLA-V1."
+    },
+    {
+      "id": "tc-con-041",
+      "claim": "We guarantee our infrastructure delivers 99.00% uptime availability.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-SLA-V1",
+      "matched_fact": "Enterprise Cloud SLA Guarantee",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Discrepancy detected with approved fact \"Enterprise Cloud SLA Guarantee\" (v1). Claim states 99.00%, but approved fact is 99.99% per source DOC-2026-SLA-V1."
+    },
+    {
+      "id": "tc-con-042",
+      "claim": "Try Acme Cloud Pro risk-free for a 90 days trial period.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-TERMS-2026",
+      "matched_fact": "Standard Evaluation Trial Period",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Discrepancy detected with approved fact \"Standard Evaluation Trial Period\" (v1). Claim states 90 days, but approved fact is 14 days per source DOC-TERMS-2026."
+    },
+    {
+      "id": "tc-con-043",
+      "claim": "Start building with a 10 days trial without credit card.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-TERMS-2026",
+      "matched_fact": "Standard Evaluation Trial Period",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Discrepancy detected with approved fact \"Standard Evaluation Trial Period\" (v1). Claim states 10 days, but approved fact is 14 days per source DOC-TERMS-2026."
+    },
+    {
+      "id": "tc-con-044",
+      "claim": "Our cryptographic engine is completely 100% bug-free without exceptions.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "BRAND_RULE_POLICIES",
+      "matched_fact": "Prohibition of Absolute Software Claims",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Violation of brand rule [BR-NO-ABSOLUTE-CLAIMS]: \"100% bug-free\" is a prohibited or misleading term (Legal policy forbids asserting that software or infrastructure is 100% bug-free, unhackable, or completely infallible.)."
+    },
+    {
+      "id": "tc-con-045",
+      "claim": "All developer accounts are granted unlimited free forever access.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "BRAND_RULE_POLICIES",
+      "matched_fact": "No Unauthorized Lifetime Discount Phrases",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Violation of brand rule [BR-UNAUTHORIZED-PRICING]: \"unlimited free forever\" is a prohibited or misleading term (Commercial guidelines prohibit unauthorized lifetime free claims without executive approval.)."
+    },
+    {
+      "id": "tc-con-046",
+      "claim": "Acme Cloud Pro is advertised at ₹890/month on affiliate networks.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-PRICING-V2",
+      "matched_fact": "Acme Cloud Pro Monthly Subscription",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Discrepancy detected with approved fact \"Acme Cloud Pro Monthly Subscription\" (v1). Claim states ₹890, but approved fact is ₹999/month per source DOC-2026-PRICING-V2."
+    },
+    {
+      "id": "tc-con-047",
+      "claim": "Our cloud platform runs with 99.95% uptime availability.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-SLA-V1",
+      "matched_fact": "Enterprise Cloud SLA Guarantee",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Discrepancy detected with approved fact \"Enterprise Cloud SLA Guarantee\" (v1). Claim states 99.95%, but approved fact is 99.99% per source DOC-2026-SLA-V1."
+    },
+    {
+      "id": "tc-con-048",
+      "claim": "Sign up for a 28 days trial on our enterprise tier.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-TERMS-2026",
+      "matched_fact": "Standard Evaluation Trial Period",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Discrepancy detected with approved fact \"Standard Evaluation Trial Period\" (v1). Claim states 28 days, but approved fact is 14 days per source DOC-TERMS-2026."
+    },
+    {
+      "id": "tc-con-049",
+      "claim": "Our AI model achieves 100% bug-free verification in production.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "BRAND_RULE_POLICIES",
+      "matched_fact": "Prohibition of Absolute Software Claims",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Violation of brand rule [BR-NO-ABSOLUTE-CLAIMS]: \"100% bug-free\" is a prohibited or misleading term (Legal policy forbids asserting that software or infrastructure is 100% bug-free, unhackable, or completely infallible.)."
+    },
+    {
+      "id": "tc-con-050",
+      "claim": "Acme offers an unlimited free forever package for educational institutions.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "BRAND_RULE_POLICIES",
+      "matched_fact": "No Unauthorized Lifetime Discount Phrases",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Violation of brand rule [BR-UNAUTHORIZED-PRICING]: \"unlimited free forever\" is a prohibited or misleading term (Commercial guidelines prohibit unauthorized lifetime free claims without executive approval.)."
+    },
+    {
+      "id": "tc-con-051",
+      "claim": "Acme Cloud Pro price is marked down to ₹650/month this month.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-PRICING-V2",
+      "matched_fact": "Acme Cloud Pro Monthly Subscription",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Discrepancy detected with approved fact \"Acme Cloud Pro Monthly Subscription\" (v1). Claim states ₹650, but approved fact is ₹999/month per source DOC-2026-PRICING-V2."
+    },
+    {
+      "id": "tc-con-052",
+      "claim": "SLA uptime guarantee is 98.9% availability for standard pods.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-2026-SLA-V1",
+      "matched_fact": "Enterprise Cloud SLA Guarantee",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Discrepancy detected with approved fact \"Enterprise Cloud SLA Guarantee\" (v1). Claim states 98.9%, but approved fact is 99.99% per source DOC-2026-SLA-V1."
+    },
+    {
+      "id": "tc-con-053",
+      "claim": "Our free trial spans 5 days for developer accounts.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "DOC-TERMS-2026",
+      "matched_fact": "Standard Evaluation Trial Period",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Discrepancy detected with approved fact \"Standard Evaluation Trial Period\" (v1). Claim states 5 days, but approved fact is 14 days per source DOC-TERMS-2026."
+    },
+    {
+      "id": "tc-con-054",
+      "claim": "Acme software is 100% bug-free across all edge environments.",
+      "expected": "CONTRADICTED",
+      "predicted": "CONTRADICTED",
+      "is_correct": true,
+      "evidence_ref": "BRAND_RULE_POLICIES",
+      "matched_fact": "Prohibition of Absolute Software Claims",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Violation of brand rule [BR-NO-ABSOLUTE-CLAIMS]: \"100% bug-free\" is a prohibited or misleading term (Legal policy forbids asserting that software or infrastructure is 100% bug-free, unhackable, or completely infallible.)."
+    },
+    {
+      "id": "tc-unv-001",
+      "claim": "Acme Technologies was founded by former NASA astronauts in Zurich.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-002",
+      "claim": "Over 85% of Fortune 500 enterprises rely on Acme infrastructure daily.",
+      "expected": "UNVERIFIED",
+      "predicted": "CONTRADICTED",
+      "is_correct": false,
+      "evidence_ref": "DOC-2026-SLA-V1",
+      "matched_fact": "Enterprise Cloud SLA Guarantee",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Discrepancy detected with approved fact \"Enterprise Cloud SLA Guarantee\" (v1). Claim states 85%, but approved fact is 99.99% per source DOC-2026-SLA-V1."
+    },
+    {
+      "id": "tc-unv-003",
+      "claim": "Acme reduced enterprise carbon emissions by 42% across regional facilities.",
+      "expected": "UNVERIFIED",
+      "predicted": "CONTRADICTED",
+      "is_correct": false,
+      "evidence_ref": "DOC-2026-SLA-V1",
+      "matched_fact": "Enterprise Cloud SLA Guarantee",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Discrepancy detected with approved fact \"Enterprise Cloud SLA Guarantee\" (v1). Claim states 42%, but approved fact is 99.99% per source DOC-2026-SLA-V1."
+    },
+    {
+      "id": "tc-unv-004",
+      "claim": "Our machine learning models process 10 billion events per millisecond.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-005",
+      "claim": "Acme was voted the #1 Cloud Security Provider by TechBeacon in 2025.",
+      "expected": "UNVERIFIED",
+      "predicted": "CONTRADICTED",
+      "is_correct": false,
+      "evidence_ref": "DOC-2026-PRICING-V2",
+      "matched_fact": "Acme Cloud Pro Monthly Subscription",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Topic relates to \"Acme Cloud Pro Monthly Subscription\", but the stated claim does not reflect the approved value \"₹999/month\"."
+    },
+    {
+      "id": "tc-unv-006",
+      "claim": "Acme raised $250 million in Series D venture capital funding.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-007",
+      "claim": "Our engineering headquarters relocated to Singapore in 2024.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-008",
+      "claim": "Acme employs over 4,000 security specialists across six global hubs.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-009",
+      "claim": "We maintain submarine fiber cables connecting Iceland to Scandinavia.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-010",
+      "claim": "Acme platform integrates natively with Quantum Key Distribution satellites.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-011",
+      "claim": "Customers report an average 310% return on investment within 90 days.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-012",
+      "claim": "Acme CEO previously served as Chief Technology Officer for INTERPOL.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-013",
+      "claim": "Our microservice compiler was patented in Geneva in 2018.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-014",
+      "claim": "Acme acquired CyberSentinel Labs for $120 million in an all-cash deal.",
+      "expected": "UNVERIFIED",
+      "predicted": "CONTRADICTED",
+      "is_correct": false,
+      "evidence_ref": "DOC-2026-PRICING-V2",
+      "matched_fact": "Acme Cloud Pro Monthly Subscription",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Discrepancy detected with approved fact \"Acme Cloud Pro Monthly Subscription\" (v1). Claim states $120, but approved fact is ₹999/month per source DOC-2026-PRICING-V2."
+    },
+    {
+      "id": "tc-unv-015",
+      "claim": "Over 500 universities incorporate Acme into their cybersecurity curriculum.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-016",
+      "claim": "Acme Cloud Pro includes built-in automated tax filing for European VAT.",
+      "expected": "UNVERIFIED",
+      "predicted": "CONTRADICTED",
+      "is_correct": false,
+      "evidence_ref": "DOC-2026-PRICING-V2",
+      "matched_fact": "Acme Cloud Pro Monthly Subscription",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Topic relates to \"Acme Cloud Pro Monthly Subscription\", but the stated claim does not reflect the approved value \"₹999/month\"."
+    },
+    {
+      "id": "tc-unv-017",
+      "claim": "Our data centers run on 100% geothermal power sources in Reykjavik.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-018",
+      "claim": "Acme database caches have zero nanosecond latency in edge benchmarks.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-019",
+      "claim": "Acme was awarded the European Cyber Defense Medal of Honor in 2023.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-020",
+      "claim": "We provide direct satellite uplinks via Starlink mesh arrays.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-021",
+      "claim": "Acme guarantees zero packet loss on transatlantic connections.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-022",
+      "claim": "Our platform was selected by the United Nations for climate monitoring.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-023",
+      "claim": "Acme provides automated voice translation in 140 regional languages.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-024",
+      "claim": "All new customers receive an Acme hardware security token in the mail.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-025",
+      "claim": "Acme was founded during the 2012 solar flare blackout in Oslo.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-026",
+      "claim": "We process 50 million electronic healthcare records per second.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-027",
+      "claim": "Acme developers wrote the core protocols for DNS over HTTPS.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-028",
+      "claim": "Our automated compliance scanner was trained on 400 years of legal jurisprudence.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-029",
+      "claim": "Acme supports instant offline reconciliation in submarine environments.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-030",
+      "claim": "Over 92% of enterprise customers renew their multi-year contracts.",
+      "expected": "UNVERIFIED",
+      "predicted": "CONTRADICTED",
+      "is_correct": false,
+      "evidence_ref": "DOC-2026-SLA-V1",
+      "matched_fact": "Enterprise Cloud SLA Guarantee",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Discrepancy detected with approved fact \"Enterprise Cloud SLA Guarantee\" (v1). Claim states 92%, but approved fact is 99.99% per source DOC-2026-SLA-V1."
+    },
+    {
+      "id": "tc-unv-031",
+      "claim": "Acme hardware servers use liquid nitrogen cooling jackets.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-032",
+      "claim": "The founding team met while competing in the International Olympiad in Informatics.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-033",
+      "claim": "Acme generates zero electronic waste through our circular silicon program.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-034",
+      "claim": "Our AI agent can predict zero-day vulnerabilities 14 days in advance.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-035",
+      "claim": "Acme infrastructure survived a simulated asteroid EMP pulse in 2024.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-036",
+      "claim": "We provide free enterprise licenses to certified wildlife conservation non-profits.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-037",
+      "claim": "Acme operates an underground cryptographic vault in the Swiss Alps.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-038",
+      "claim": "Customer onboarding takes exactly 3 minutes and 42 seconds on average.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-039",
+      "claim": "Our database query engine is written in hand-optimized ARM assembly.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-040",
+      "claim": "Acme is endorsed by the Cyber Threat Alliance Executive Council.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-041",
+      "claim": "All employee workstations are air-gapped from commercial internet providers.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-042",
+      "claim": "Acme hosts the official cryptographic mirrors for the Rust package registry.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-043",
+      "claim": "Our customer support team is based in Dublin, Ireland and Singapore.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-044",
+      "claim": "Acme platform automatically translates legal contracts into mathematical proofs.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-045",
+      "claim": "Our enterprise tier was deployed across 60 global airports in 2025.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-046",
+      "claim": "Acme founders hold 18 patents in homomorphic encryption architectures.",
+      "expected": "UNVERIFIED",
+      "predicted": "UNVERIFIED",
+      "is_correct": true,
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "No approved fact or brand rule in the Knowledge Base directly verifies this claim."
+    },
+    {
+      "id": "tc-unv-047",
+      "claim": "Acme Cloud Pro is compatible with legacy IBM AS/400 mainframes.",
+      "expected": "UNVERIFIED",
+      "predicted": "CONTRADICTED",
+      "is_correct": false,
+      "evidence_ref": "DOC-2026-PRICING-V2",
+      "matched_fact": "Acme Cloud Pro Monthly Subscription",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Topic relates to \"Acme Cloud Pro Monthly Subscription\", but the stated claim does not reflect the approved value \"₹999/month\"."
+    },
+    {
+      "id": "tc-unv-048",
+      "claim": "Our platform processes 100% of all sovereign identity checks in Estonia.",
+      "expected": "UNVERIFIED",
+      "predicted": "CONTRADICTED",
+      "is_correct": false,
+      "evidence_ref": "DOC-2026-SLA-V1",
+      "matched_fact": "Enterprise Cloud SLA Guarantee",
+      "engine": "Deterministic EvidenceGuard Engine",
+      "explanation": "Discrepancy detected with approved fact \"Enterprise Cloud SLA Guarantee\" (v1). Claim states 100%, but approved fact is 99.99% per source DOC-2026-SLA-V1."
+    }
+  ]
+}

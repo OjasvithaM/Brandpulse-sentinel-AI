@@ -149,9 +149,20 @@ export const TrustPassportsView: React.FC<TrustPassportsViewProps> = ({
               <div className="space-y-3">
                 {/* Passport Top Badges */}
                 <div className="flex items-center justify-between">
-                  <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
-                    {p.passport_code}
-                  </span>
+                  <div className="flex items-center space-x-1.5">
+                    <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+                      {p.passport_code}
+                    </span>
+                    {p.signature_algorithm === 'Ed25519' ? (
+                      <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        Ed25519
+                      </span>
+                    ) : !p.signature ? (
+                      <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                        LEGACY
+                      </span>
+                    ) : null}
+                  </div>
                   <span
                     className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
                       isPassed
@@ -443,10 +454,18 @@ export const TrustPassportsView: React.FC<TrustPassportsViewProps> = ({
                 </div>
                 <div className="font-mono text-[10px] space-y-1 bg-slate-950 p-2.5 rounded border border-slate-800 break-all">
                   <div className="text-slate-400">
+                    Algorithm: <span className="text-cyan-400 font-semibold">{selectedPassport.signature_algorithm || (selectedPassport.signature ? 'Ed25519' : 'LEGACY_UNSIGNED')}</span>
+                  </div>
+                  {selectedPassport.key_id && (
+                    <div className="text-slate-400">
+                      Key ID: <span className="text-indigo-400 font-semibold">{selectedPassport.key_id}</span>
+                    </div>
+                  )}
+                  <div className="text-slate-400">
                     Payload Digest: <span className="text-cyan-400">{selectedPassport.payload_digest || 'SHA256-CANONICAL-DIGEST-VERIFIED'}</span>
                   </div>
                   <div className="text-slate-400">
-                    HMAC-SHA256 Signature: <span className="text-emerald-300">{selectedPassport.signature || 'b84a9e102f...c0889df9a'}</span>
+                    Digital Signature: <span className={selectedPassport.signature ? 'text-emerald-300' : 'text-amber-400'}>{selectedPassport.signature || 'NONE (Legacy unsigned passport generated before cryptographic signing requirements)'}</span>
                   </div>
                   <div className="text-slate-400">
                     Certifying CA: <span className="text-slate-200">BrandPulse Governance Authority CA</span>
@@ -489,16 +508,22 @@ export const TrustPassportsView: React.FC<TrustPassportsViewProps> = ({
           <div className="bg-[#0b1220] border border-cyan-800/80 rounded-xl max-w-lg w-full p-6 shadow-2xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center space-x-2">
-                {signatureResult.valid ? (
+                {signatureResult.status === 'VALID' ? (
                   <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                ) : signatureResult.status === 'LEGACY_NOT_SIGNED' ? (
+                  <AlertTriangle className="w-5 h-5 text-amber-400" />
                 ) : (
                   <ShieldAlert className="w-5 h-5 text-rose-500" />
                 )}
                 <h3 className="text-sm font-bold text-slate-100 font-mono">
-                  {signatureResult.valid ? 'Signature Integrity Verified' : 'Cryptographic Verification Failure'}
+                  {signatureResult.status === 'VALID'
+                    ? 'Ed25519 Signature Verified (Authentic)'
+                    : signatureResult.status === 'LEGACY_NOT_SIGNED'
+                    ? 'Legacy Passport — Not Digitally Signed'
+                    : 'Cryptographic Tamper Detected!'}
                 </h3>
               </div>
-              <button onClick={() => setSignatureResult(null)} className="text-slate-400 hover:text-slate-200">
+              <button onClick={() => setSignatureResult(null)} className="text-slate-400 hover:text-slate-200 cursor-pointer">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -509,19 +534,19 @@ export const TrustPassportsView: React.FC<TrustPassportsViewProps> = ({
 
             <div className="bg-slate-950 p-3 rounded-lg border border-slate-800 text-[10px] font-mono space-y-1.5 break-all">
               <div className="text-slate-400">
-                Algorithm: <span className="text-cyan-400">HMAC-SHA256</span>
+                Algorithm: <span className="text-cyan-400">{signatureResult.algorithm || 'Ed25519'}</span>
               </div>
               <div className="text-slate-400">
-                Signer: <span className="text-slate-200">{signatureResult.signer_identity}</span>
+                Key ID: <span className="text-indigo-400">{signatureResult.key_id || 'None'}</span>
               </div>
               <div className="text-slate-400">
-                Canonical Digest: <span className="text-slate-300">{signatureResult.canonical_digest}</span>
+                Signer Identity: <span className="text-slate-200">{signatureResult.signer_identity}</span>
               </div>
               <div className="text-slate-400">
-                Computed Signature: <span className="text-emerald-400">{signatureResult.computed_signature}</span>
+                Canonical Payload Digest: <span className="text-slate-300">{signatureResult.payload_digest || signatureResult.canonical_digest}</span>
               </div>
               <div className="text-slate-400">
-                Expected Signature: <span className="text-emerald-400">{signatureResult.expected_signature}</span>
+                Signature Hex: <span className="text-emerald-400">{signatureResult.signature || 'None'}</span>
               </div>
             </div>
 

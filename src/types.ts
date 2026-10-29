@@ -87,6 +87,7 @@ export interface TrustPassport {
   previous_passport?: TrustPassport | null;
   signature?: string;
   signature_algorithm?: string;
+  key_id?: string;
   payload_digest?: string;
   signed_at?: string;
 }

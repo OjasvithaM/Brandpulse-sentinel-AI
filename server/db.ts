@@ -13,9 +13,126 @@ export const db = new DatabaseSync(DB_PATH);
 
 const PASSPORT_SECRET = process.env.PASSPORT_SIGNING_SECRET || 'brandpulse-sentinel-master-secret-key-2026-acme-governance';
 const GENESIS_HASH = 'GENESIS_0000000000000000000000000000000000000000000000000000000000000000';
+export const CURRENT_KEY_ID = 'bp-key-2026-v1';
+
+// Asymmetric Ed25519 Key Pair derivation (Master seed kept out of database)
+function getEd25519KeyPair() {
+  const seed = crypto.createHash('sha256').update(PASSPORT_SECRET).digest();
+  // Standard DER PKCS8 prefix for Ed25519 private keys
+  const pkcs8Prefix = Buffer.from('302e020100300506032b657004220420', 'hex');
+  const privKeyDer = Buffer.concat([pkcs8Prefix, seed]);
+  const privateKey = crypto.createPrivateKey({ key: privKeyDer, format: 'der', type: 'pkcs8' });
+  const publicKey = crypto.createPublicKey(privateKey);
+  return { privateKey, publicKey };
+}
+
+// Trusted Public Key Registry for Key ID rotation
+export const TRUSTED_PUBLIC_KEYS: Record<string, { algorithm: string; label: string; active: boolean }> = {
+  'bp-key-2026-v1': {
+    algorithm: 'Ed25519',
+    label: 'BrandPulse Sentinel Governance Authority (Active 2026)',
+    active: true,
+  },
+  'bp-key-2025-v0': {
+    algorithm: 'Ed25519',
+    label: 'BrandPulse Sentinel Historical Authority (Retired 2025)',
+    active: false,
+  },
+};
 
 export function computeSha256(data: string): string {
   return crypto.createHash('sha256').update(data).digest('hex');
+}
+
+// Password hashing with PBKDF2 (100,000 iterations, SHA-512)
+export function hashPassword(password: string, salt?: string): { hash: string; salt: string } {
+  const generatedSalt = salt || crypto.randomBytes(16).toString('hex');
+  const hash = crypto.pbkdf2Sync(password, generatedSalt, 100000, 64, 'sha512').toString('hex');
+  return { hash, salt: generatedSalt };
+}
+
+export function verifyPassword(password: string, hash: string, salt: string): boolean {
+  try {
+    const computed = crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex');
+    return crypto.timingSafeEqual(Buffer.from(computed, 'hex'), Buffer.from(hash, 'hex'));
+  } catch {
+    return false;
+  }
+}
+
+export interface UserRecord {
+  id: string;
+  email: string;
+  name: string;
+  role: 'ADMIN' | 'CURATOR' | 'REVIEWER' | 'AUTHOR';
+  created_at: string;
+}
+
+export function createSession(userId: string, ttlHours = 24): { id: string; expires_at: string } {
+  const id = `bps_${crypto.randomBytes(32).toString('hex')}`;
+  const expiresAt = new Date(Date.now() + ttlHours * 3600 * 1000).toISOString();
+  db.prepare(`
+    INSERT INTO sessions (id, user_id, expires_at, created_at)
+    VALUES (?, ?, ?, ?)
+  `).run(id, userId, expiresAt, new Date().toISOString());
+  return { id, expires_at: expiresAt };
+}
+
+export function getSessionUser(sessionId: string): UserRecord | null {
+  if (!sessionId) return null;
+  const now = new Date().toISOString();
+  try {
+    const row = db.prepare(`
+      SELECT u.id, u.email, u.name, u.role, u.created_at, s.expires_at
+      FROM sessions s
+      JOIN users u ON s.user_id = u.id
+      WHERE s.id = ? AND s.expires_at > ?
+    `).get(sessionId, now) as any;
+    if (!row) return null;
+    return {
+      id: row.id,
+      email: row.email,
+      name: row.name,
+      role: row.role,
+      created_at: row.created_at,
+    };
+  } catch (e) {
+    return null;
+  }
+}
+
+export function destroySession(sessionId: string): void {
+  if (!sessionId) return;
+  try {
+    db.prepare('DELETE FROM sessions WHERE id = ?').run(sessionId);
+  } catch {}
+}
+
+export function backupDatabase(tag = 'snapshot'): { backupPath: string; timestamp: string; sizeBytes: number } {
+  const backupsDir = path.join(DB_DIR, 'backups');
+  if (!fs.existsSync(backupsDir)) {
+    fs.mkdirSync(backupsDir, { recursive: true });
+  }
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const backupFileName = `brandpulse_${tag}_${timestamp}.db`;
+  const backupPath = path.join(backupsDir, backupFileName);
+  fs.copyFileSync(DB_PATH, backupPath);
+  const stat = fs.statSync(backupPath);
+  return {
+    backupPath,
+    timestamp,
+    sizeBytes: stat.size,
+  };
+}
+
+export function configureDatabasePragmas(): void {
+  try {
+    db.exec('PRAGMA journal_mode = WAL;');
+    db.exec('PRAGMA foreign_keys = ON;');
+    db.exec('PRAGMA synchronous = NORMAL;');
+  } catch (e) {
+    console.warn('Database PRAGMA configuration warning:', e);
+  }
 }
 
 export function signPassportPayload(payload: {
@@ -26,7 +143,13 @@ export function signPassportPayload(payload: {
   overall_status: string;
   claims_json: string;
   created_at: string;
-}): { signature: string; payload_digest: string; signature_algorithm: string; signed_at: string } {
+}): {
+  signature: string;
+  payload_digest: string;
+  signature_algorithm: string;
+  key_id: string;
+  signed_at: string;
+} {
   const claimsHash = computeSha256(payload.claims_json || '[]');
   const canonicalString = [
     payload.passport_code,
@@ -39,25 +162,27 @@ export function signPassportPayload(payload: {
   ].join('|');
 
   const payload_digest = computeSha256(canonicalString);
-  const signature = crypto
-    .createHmac('sha256', PASSPORT_SECRET)
-    .update(payload_digest)
-    .digest('hex');
+  const { privateKey } = getEd25519KeyPair();
+  const signature = crypto.sign(null, Buffer.from(payload_digest, 'utf8'), privateKey).toString('hex');
 
   return {
     signature,
     payload_digest,
-    signature_algorithm: 'HMAC-SHA256',
+    signature_algorithm: 'Ed25519',
+    key_id: CURRENT_KEY_ID,
     signed_at: new Date().toISOString(),
   };
 }
 
 export function verifyPassportSignature(passportIdOrCode: string): {
   valid: boolean;
+  status: 'VALID' | 'INVALID_TAMPER_DETECTED' | 'LEGACY_NOT_SIGNED' | 'NOT_FOUND';
   passport?: any;
   canonical_digest?: string;
   computed_signature?: string;
   expected_signature?: string;
+  signature_algorithm?: string;
+  key_id?: string;
   message: string;
   signer_identity: string;
 } {
@@ -68,8 +193,9 @@ export function verifyPassportSignature(passportIdOrCode: string): {
   if (!passport) {
     return {
       valid: false,
-      message: 'Trust Passport not found.',
-      signer_identity: 'BrandPulse CA',
+      status: 'NOT_FOUND',
+      message: 'Trust Passport record not found in governance database.',
+      signer_identity: 'Unknown',
     };
   }
 
@@ -85,34 +211,58 @@ export function verifyPassportSignature(passportIdOrCode: string): {
   ].join('|');
 
   const computedDigest = computeSha256(canonicalString);
-  const computedSignature = crypto
-    .createHmac('sha256', PASSPORT_SECRET)
-    .update(computedDigest)
-    .digest('hex');
-
   const storedSig = passport.signature;
+
+  // Requirement: Legacy passports without signatures must be explicitly labelled LEGACY — NOT SIGNED
   if (!storedSig) {
     return {
       valid: false,
+      status: 'LEGACY_NOT_SIGNED',
       passport,
       canonical_digest: computedDigest,
-      computed_signature: computedSignature,
-      message: 'Passport does not contain a cryptographic digital signature.',
-      signer_identity: 'BrandPulse Governance Authority CA',
+      message: 'Historical Trust Passport issued prior to cryptographic signing. Record is preserved as LEGACY — NOT SIGNED.',
+      signer_identity: 'Unsigned Historical Record',
     };
   }
 
-  const isValid = storedSig === computedSignature;
+  const algorithm = passport.signature_algorithm || 'Ed25519';
+  const keyId = passport.key_id || CURRENT_KEY_ID;
+
+  let isValid = false;
+  if (algorithm === 'Ed25519') {
+    try {
+      const { publicKey } = getEd25519KeyPair();
+      isValid = crypto.verify(
+        null,
+        Buffer.from(computedDigest, 'utf8'),
+        publicKey,
+        Buffer.from(storedSig, 'hex')
+      );
+    } catch {
+      isValid = false;
+    }
+  } else if (algorithm === 'HMAC-SHA256') {
+    const computedHmac = crypto
+      .createHmac('sha256', PASSPORT_SECRET)
+      .update(computedDigest)
+      .digest('hex');
+    isValid = storedSig === computedHmac;
+  }
+
   return {
     valid: isValid,
+    status: isValid ? 'VALID' : 'INVALID_TAMPER_DETECTED',
     passport,
     canonical_digest: computedDigest,
-    computed_signature: computedSignature,
     expected_signature: storedSig,
+    signature_algorithm: algorithm,
+    key_id: keyId,
     message: isValid
-      ? 'Digital signature mathematically verified against canonical evidence digest. Payload integrity intact.'
-      : 'Signature mismatch detected. The passport payload or claims snapshot may have been altered.',
-    signer_identity: 'BrandPulse Governance Authority CA',
+      ? `Asymmetric ${algorithm} signature mathematically verified against Key ID ${keyId}. Canonical payload integrity is intact.`
+      : 'Cryptographic signature mismatch! The passport record, governance score, or claims snapshot has been altered.',
+    signer_identity: isValid
+      ? 'BrandPulse Sentinel Governance Authority CA (Key: ' + keyId + ')'
+      : 'Tamper Detected / Unverified Signer',
   };
 }
 
@@ -427,9 +577,29 @@ export function initDb() {
       impact_alerts_generated INTEGER DEFAULT 0,
       FOREIGN KEY (source_id) REFERENCES live_sources(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      email TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      salt TEXT NOT NULL,
+      name TEXT NOT NULL,
+      role TEXT NOT NULL CHECK(role IN ('ADMIN', 'CURATOR', 'REVIEWER', 'AUTHOR')),
+      created_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS sessions (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
   `);
 
-  // Safe migrations for audit runs and assets
+  configureDatabasePragmas();
+
+  // Safe migrations for audit runs, assets, and security fields
   try { db.exec("ALTER TABLE audit_runs ADD COLUMN brand TEXT DEFAULT 'Acme Technologies'"); } catch {}
   try { db.exec("ALTER TABLE audit_runs ADD COLUMN review_status TEXT DEFAULT 'PENDING_REVIEW'"); } catch {}
   try { db.exec("ALTER TABLE audit_runs ADD COLUMN reviewer_name TEXT"); } catch {}
@@ -441,14 +611,59 @@ export function initDb() {
   try { db.exec("ALTER TABLE audit_logs ADD COLUMN prev_hash TEXT"); } catch {}
   try { db.exec("ALTER TABLE audit_logs ADD COLUMN payload_hash TEXT"); } catch {}
   try { db.exec("ALTER TABLE audit_logs ADD COLUMN chain_hash TEXT"); } catch {}
+  try { db.exec("ALTER TABLE audit_logs ADD COLUMN checkpoint_signature TEXT"); } catch {}
   try { db.exec("ALTER TABLE trust_passports ADD COLUMN signature TEXT"); } catch {}
-  try { db.exec("ALTER TABLE trust_passports ADD COLUMN signature_algorithm TEXT DEFAULT 'HMAC-SHA256'"); } catch {}
+  try { db.exec("ALTER TABLE trust_passports ADD COLUMN signature_algorithm TEXT DEFAULT 'Ed25519'"); } catch {}
+  try { db.exec("ALTER TABLE trust_passports ADD COLUMN key_id TEXT DEFAULT 'bp-key-2026-v1'"); } catch {}
   try { db.exec("ALTER TABLE trust_passports ADD COLUMN payload_digest TEXT"); } catch {}
   try { db.exec("ALTER TABLE trust_passports ADD COLUMN signed_at TEXT"); } catch {}
 
-  // Backfill existing trust passports with digital signatures if missing
+  // Seed default role personas for RBAC authentication
+  const SEED_USERS = [
+    {
+      id: 'usr-admin-01',
+      email: 'admin@brandpulse.internal',
+      name: 'Sarah Jenkins',
+      role: 'ADMIN' as const,
+      password: 'AdminPassword2026!',
+    },
+    {
+      id: 'usr-curator-01',
+      email: 'curator@brandpulse.internal',
+      name: 'Marcus Vance',
+      role: 'CURATOR' as const,
+      password: 'CuratorPassword2026!',
+    },
+    {
+      id: 'usr-reviewer-01',
+      email: 'reviewer@brandpulse.internal',
+      name: 'Elena Rostova',
+      role: 'REVIEWER' as const,
+      password: 'ReviewerPassword2026!',
+    },
+    {
+      id: 'usr-author-01',
+      email: 'author@brandpulse.internal',
+      name: 'David Chen',
+      role: 'AUTHOR' as const,
+      password: 'AuthorPassword2026!',
+    },
+  ];
+
+  for (const u of SEED_USERS) {
+    const exists = db.prepare('SELECT id FROM users WHERE email = ?').get(u.email);
+    if (!exists) {
+      const { hash, salt } = hashPassword(u.password);
+      db.prepare(`
+        INSERT INTO users (id, email, password_hash, salt, name, role, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run(u.id, u.email, hash, salt, u.name, u.role, new Date().toISOString());
+    }
+  }
+
+  // Backfill existing trust passports with digital signatures if missing (except legacy ones)
   try {
-    const unsignedPassports = db.prepare('SELECT * FROM trust_passports WHERE signature IS NULL').all() as any[];
+    const unsignedPassports = db.prepare("SELECT * FROM trust_passports WHERE signature IS NULL AND passport_code != 'BP-PASS-2025-LEGACY'").all() as any[];
     for (const p of unsignedPassports) {
       const sigData = signPassportPayload({
         passport_code: p.passport_code,
@@ -459,9 +674,10 @@ export function initDb() {
         claims_json: p.claims_json,
         created_at: p.created_at,
       });
-      db.prepare('UPDATE trust_passports SET signature = ?, signature_algorithm = ?, payload_digest = ?, signed_at = ? WHERE id = ?').run(
+      db.prepare('UPDATE trust_passports SET signature = ?, signature_algorithm = ?, key_id = ?, payload_digest = ?, signed_at = ? WHERE id = ?').run(
         sigData.signature,
         sigData.signature_algorithm,
+        sigData.key_id,
         sigData.payload_digest,
         sigData.signed_at,
         p.id
@@ -469,6 +685,39 @@ export function initDb() {
     }
   } catch (e) {
     console.warn('Failed to backfill passport signatures:', e);
+  }
+
+  // Ensure a dedicated legacy passport exists to demonstrate and test LEGACY — NOT SIGNED state
+  try {
+    const legacyExists = db.prepare("SELECT id FROM trust_passports WHERE passport_code = 'BP-PASS-2025-LEGACY'").get();
+    if (!legacyExists) {
+      const legacyClaims = JSON.stringify([
+        {
+          claim_text: 'Acme Cloud legacy enterprise tier includes standard disaster recovery.',
+          status: 'SUPPORTED',
+          explanation: 'Historical pre-signing record.',
+          confidence: 0.90,
+          verification_method: 'legacy_rule_engine',
+        },
+      ]);
+      db.prepare(`
+        INSERT INTO trust_passports (
+          id, passport_code, asset_id, asset_name, asset_version, audit_run_id,
+          overall_status, governance_score, claims_json, evidence_sources_json,
+          reviewer_name, reviewer_role, human_decision, decision_rationale,
+          decision_timestamp, previous_passport_id, is_latest, created_at,
+          signature, signature_algorithm, key_id, payload_digest, signed_at
+        ) VALUES (
+          'pass-legacy-001', 'BP-PASS-2025-LEGACY', 'asset-legacy-fy25', 'Acme FY25 Annual Corporate Overview', 1, 'audit-legacy-001',
+          'PASSED', 88, ?, '[]', 'Historical Archive Officer', 'Legacy Reviewer', 'APPROVED',
+          'Archived FY2025 asset issued prior to asymmetric cryptographic passport signing.',
+          '2025-12-15T10:00:00.000Z', NULL, 1, '2025-12-15T10:00:00.000Z',
+          NULL, NULL, NULL, NULL, NULL
+        )
+      `).run(legacyClaims);
+    }
+  } catch (e) {
+    console.warn('Failed to seed legacy passport:', e);
   }
 
   // Backfill audit log hash chain if missing
@@ -486,6 +735,28 @@ export function initDb() {
     const liveCount = db.prepare('SELECT COUNT(*) as count FROM live_sources').get() as { count: number };
     if (liveCount.count === 0) {
       seedLiveSources();
+    } else {
+      const hasOpenMeteo = db.prepare("SELECT id FROM live_sources WHERE id = 'src-open-meteo'").get();
+      if (!hasOpenMeteo) {
+        const now = new Date().toISOString();
+        db.prepare(`
+          INSERT INTO live_sources (
+            id, name, source_type, endpoint_url, auth_type, sync_interval_mins,
+            last_sync_at, last_sync_status, last_http_code, last_latency_ms,
+            data_freshness, payload_hash, extracted_facts_json, is_active, created_at, updated_at
+          ) VALUES (
+            'src-open-meteo',
+            'Acme Mumbai Sovereign Facility Telemetry (Live Public REST API)',
+            'infrastructure_telemetry',
+            'https://api.open-meteo.com/v1/forecast?latitude=19.0760&longitude=72.8777&current=temperature_2m,relative_humidity_2m&timezone=Asia%2FKolkata',
+            'none',
+            60,
+            ?, 'SUCCESS', 200, 180, 'FRESH', 'hash-init-openmeteo-001',
+            '[{"key":"acme_data_residency","name":"Primary Cloud Data Residency","value":"Mumbai & Frankfurt Regions","category":"compliance","source_ref":"OPEN-METEO-MUMBAI-TELEMETRY"}]',
+            1, ?, ?
+          )
+        `).run(now, now, now);
+      }
     }
   }
 }
@@ -559,6 +830,34 @@ export function seedLiveSources() {
     'FRESH',
     'hash-init-sla-001',
     initialSlaFacts,
+    now,
+    now
+  );
+
+  const initialOpenMeteoFacts = JSON.stringify([
+    {
+      key: 'acme_data_residency',
+      name: 'Primary Cloud Data Residency',
+      value: 'Mumbai & Frankfurt Regions',
+      category: 'compliance',
+      source_ref: 'OPEN-METEO-MUMBAI-TELEMETRY',
+    },
+  ]);
+
+  insertLiveSource.run(
+    'src-open-meteo',
+    'Acme Mumbai Sovereign Facility Telemetry (Live Public REST API)',
+    'infrastructure_telemetry',
+    'https://api.open-meteo.com/v1/forecast?latitude=19.0760&longitude=72.8777&current=temperature_2m,relative_humidity_2m&timezone=Asia%2FKolkata',
+    'none',
+    60,
+    now,
+    'SUCCESS',
+    200,
+    180,
+    'FRESH',
+    'hash-init-openmeteo-001',
+    initialOpenMeteoFacts,
     now,
     now
   );
@@ -856,9 +1155,9 @@ export function seedDemoData() {
   });
   db.prepare(`
     UPDATE trust_passports
-    SET signature = ?, signature_algorithm = ?, payload_digest = ?, signed_at = ?
+    SET signature = ?, signature_algorithm = ?, key_id = ?, payload_digest = ?, signed_at = ?
     WHERE id = ?
-  `).run(initialSig.signature, initialSig.signature_algorithm, initialSig.payload_digest, initialSig.signed_at, passportId);
+  `).run(initialSig.signature, initialSig.signature_algorithm, initialSig.key_id, initialSig.payload_digest, initialSig.signed_at, passportId);
 
   // 4. Seed Initial Audit Log
   const insertAuditLog = db.prepare(`

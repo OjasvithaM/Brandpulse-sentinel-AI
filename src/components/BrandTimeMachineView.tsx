@@ -35,6 +35,8 @@ export const BrandTimeMachineView: React.FC<BrandTimeMachineViewProps> = ({
   const [search, setSearch] = useState('');
   const [resolvingId, setResolvingId] = useState<string | null>(null);
   const [inspectingImpact, setInspectingImpact] = useState<ChangeImpact | null>(null);
+  const [isBulkRevalidating, setIsBulkRevalidating] = useState(false);
+  const [bulkRevalidateResult, setBulkRevalidateResult] = useState<any | null>(null);
 
   const filteredImpacts = impacts.filter((imp) => {
     const matchesStatus = filterStatus === 'ALL' || imp.alert_status === filterStatus;
@@ -69,6 +71,23 @@ export const BrandTimeMachineView: React.FC<BrandTimeMachineViewProps> = ({
     }
   };
 
+  const handleBulkRevalidate = async () => {
+    setIsBulkRevalidating(true);
+    try {
+      const res = await fetch('/api/impacts/bulk-revalidate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      setBulkRevalidateResult(data);
+      onRefresh();
+    } catch (err: any) {
+      alert(err.message || 'Bulk revalidation failed');
+    } finally {
+      setIsBulkRevalidating(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header Banner */}
@@ -88,8 +107,20 @@ export const BrandTimeMachineView: React.FC<BrandTimeMachineViewProps> = ({
           </p>
         </div>
 
-        {/* Quick Demo Trigger Button */}
-        <div className="shrink-0 flex items-center space-x-2">
+        {/* Quick Demo Trigger Button & One-Click Bulk Revalidation */}
+        <div className="shrink-0 flex items-center space-x-2 flex-wrap gap-2">
+          {pendingCount > 0 && (
+            <button
+              onClick={handleBulkRevalidate}
+              disabled={isBulkRevalidating}
+              className="px-3.5 py-2 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-xs transition-colors flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
+              title="One-click revalidate all affected assets and issue Ed25519-signed Trust Passports"
+            >
+              <CheckCircle2 className={`w-4 h-4 ${isBulkRevalidating ? 'animate-spin' : ''}`} />
+              <span>{isBulkRevalidating ? 'Revalidating All...' : `Bulk Revalidate (${pendingCount}) with Ed25519`}</span>
+            </button>
+          )}
+
           <button
             onClick={onSimulatePriceChange}
             className="px-3.5 py-2 rounded-md bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-xs transition-colors flex items-center space-x-2 cursor-pointer"
@@ -499,6 +530,91 @@ export const BrandTimeMachineView: React.FC<BrandTimeMachineViewProps> = ({
                   <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Revalidation Score Diff Modal */}
+      {bulkRevalidateResult && (
+        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-[#0b1220] border border-emerald-800 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto text-slate-100">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center space-x-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                <h3 className="text-sm font-bold font-mono text-slate-100">
+                  Bulk Revalidation Completed ({bulkRevalidateResult.revalidated_count} Assets Revalidated)
+                </h3>
+              </div>
+              <button onClick={() => setBulkRevalidateResult(null)} className="text-slate-400 hover:text-white">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300 bg-slate-900/80 p-3 rounded-lg border border-slate-800">
+              {bulkRevalidateResult.message} Every revalidated asset has been bumped to a new version with an Ed25519-signed Trust Passport (`bp-key-2026-v1`).
+            </p>
+
+            {/* Score Diffs Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs font-mono">
+                <thead>
+                  <tr className="border-b border-slate-800 text-slate-400 text-[10px] uppercase">
+                    <th className="p-2">Asset Name</th>
+                    <th className="p-2">Score Diff</th>
+                    <th className="p-2">Status Diff</th>
+                    <th className="p-2">New Passport</th>
+                    <th className="p-2 text-right">Signature</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60 font-sans">
+                  {bulkRevalidateResult.results.map((r: any) => (
+                    <tr key={r.asset_id} className="hover:bg-slate-900/40">
+                      <td className="p-2.5 font-medium text-slate-200">
+                        {r.asset_name} <span className="font-mono text-slate-400 text-[10px]">v{r.new_version}</span>
+                      </td>
+                      <td className="p-2.5 font-mono text-xs">
+                        <span className="text-slate-400">{r.old_score}%</span>
+                        <span className="mx-1 text-slate-500">→</span>
+                        <span className="text-emerald-400 font-bold">{r.new_score}%</span>
+                        <span className="ml-1 text-[10px] text-emerald-300">
+                          ({r.score_diff >= 0 ? `+${r.score_diff}` : r.score_diff}%)
+                        </span>
+                      </td>
+                      <td className="p-2.5 font-mono text-[10px]">
+                        <span className="text-rose-400">{r.old_status}</span>
+                        <span className="mx-1 text-slate-500">→</span>
+                        <span className="text-emerald-400 font-bold">{r.new_status}</span>
+                      </td>
+                      <td className="p-2.5 font-mono text-[11px] text-cyan-300">
+                        {r.new_passport_code}
+                      </td>
+                      <td className="p-2.5 text-right font-mono text-[10px] text-emerald-400">
+                        Ed25519 ({r.key_id})
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-800">
+              <button
+                onClick={() => setBulkRevalidateResult(null)}
+                className="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold cursor-pointer"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  setBulkRevalidateResult(null);
+                  onNavigateTab('trust_passports');
+                }}
+                className="px-4 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer flex items-center space-x-1"
+              >
+                <span>Inspect Updated Passports</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
         </div>

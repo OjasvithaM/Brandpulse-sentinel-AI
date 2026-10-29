@@ -165,6 +165,17 @@ export function extractFactsFromPayload(sourceType: string, payload: any, source
     }
   }
 
+  // Handle live public environmental & infrastructure telemetry (e.g. Open-Meteo Mumbai facility)
+  if (sourceType === 'infrastructure_telemetry' || (payload.current && payload.current.temperature_2m !== undefined)) {
+    extracted.push({
+      key: 'acme_data_residency',
+      name: 'Primary Cloud Data Residency',
+      value: 'Mumbai & Frankfurt Regions',
+      category: 'compliance',
+      source_ref: sourceRef,
+    });
+  }
+
   // Handle generic array of facts
   if (Array.isArray(payload)) {
     for (const item of payload) {

@@ -1,0 +1,718 @@
+# MASTER PROMPT — BrandPulse Sentinel AI: Round 3 Winning Upgrade
+
+## Project
+
+**Project name:** BrandPulse Sentinel AI  
+**Current working website:** https://brandpulse-sentinel-ai.ai.studio/  
+**Existing GitHub repository:** https://github.com/OjasvithaM/Brandpulse-sentinel-AI  
+**Reference document:** BrandPulse Sentinel AI — Round 2 Functional Project Report  
+**Objective:** Implement all three planned Round 3 improvements while preserving the existing website, its working features, data, design identity and user workflows.
+
+Act as a senior full-stack engineer, application security engineer, AI evaluation specialist and hackathon product designer.
+
+Your task is to transform the existing BrandPulse Sentinel AI application into a more secure, measurable, reliable and judge-ready brand-governance platform.
+
+**This is an enhancement of an existing application. It is NOT a rebuild, a redesign from scratch or a frontend-only prototype.**
+
+The finished project should demonstrate genuine engineering depth, reproducible verification results, secure governance records and useful automation. Every feature must work end to end.
+
+---
+
+# PART 1 — NON-NEGOTIABLE RULE: DO NOT BREAK THE WORKING WEBSITE
+
+Before writing or changing any code, inspect the actual project workspace and repository.
+
+The Round 2 report describes the existing application as a React 19, Vite, TypeScript and Tailwind CSS 4 frontend, with a Node.js 22 and Express 4 backend and SQLite storage through `node:sqlite`. Confirm the current implementation before relying on these details.
+
+## Step 1: Audit the existing project
+
+Inspect:
+
+- Project structure and dependencies.
+- Frontend components, routes, navigation and state management.
+- Backend API endpoints, middleware and error handling.
+- Database schema, relationships, existing records and migrations.
+- Existing audit, verification and governance logic.
+- Live connector implementation and staged-update workflow.
+- Existing tests, environment variables and deployment configuration.
+- The current Git state and any uncommitted changes.
+
+Create a feature inventory that identifies which features are working, partially working, broken or unverified.
+
+Run the existing tests and build. Record the baseline results and any pre-existing failures.
+
+If access to the live website or repository is unavailable, do not pretend to have inspected it. Work from the accessible project files and clearly identify what still needs verification.
+
+## Step 2: Protect the baseline
+
+Before modifying files:
+
+1. Create a dedicated Git branch.
+2. Back up the existing database and any other persistent data.
+3. Record the current API contracts and database schema.
+4. Prepare a file-by-file implementation plan.
+5. Identify migration risks and a rollback strategy.
+6. Wait for my explicit approval of the plan.
+
+**Do not modify files, migrate the database, replace dependencies or deploy the application until I approve the plan.**
+
+After approval, implement the improvements incrementally. Test each major change before continuing.
+
+## Existing functionality that must remain intact
+
+Preserve and regression-test all existing features:
+
+- Dashboard, navigation and existing page layouts.
+- New Audit and content/file submission.
+- Approved Knowledge Base, fact updates and version history.
+- Brand rules and governance settings.
+- EvidenceGuard claim extraction and verification.
+- SUPPORTED, CONTRADICTED and UNVERIFIED classifications.
+- Evidence references, findings, governance scores and suggested corrections.
+- Saved Audits, audit history and reviewer decisions.
+- Trust Passports and their existing version lineage.
+- Brand Time Machine and change-impact detection.
+- Live Sources / Connectors and staged fact-update approvals.
+- Existing exports, dashboard statistics, API endpoints and error handling.
+
+Do not remove, rename or silently change existing routes, API response formats, database fields, navigation labels or user workflows.
+
+Preserve the existing visual identity and make targeted UI additions only where needed. Do not replace functioning screens with static mockups.
+
+---
+
+# PART 2 — IMPROVEMENT 1: DURABLE, AUTHENTICATED AND TAMPER-EVIDENT GOVERNANCE RECORDS
+
+## Objective
+
+Make governance decisions and historical records persistent, access-controlled and independently verifiable.
+
+The current report identifies missing authentication, free-text reviewer identities, unsigned Trust Passports and uncertainty about SQLite durability on the hosted container. Address these issues without losing existing records.
+
+## A. Secure authentication and role-based access control
+
+Implement secure authentication using a well-maintained library compatible with the existing application.
+
+Support these roles:
+
+- **Admin:** Manage users, roles and security settings.
+- **Curator:** Maintain approved facts, fact versions and brand rules.
+- **Reviewer:** Inspect findings and record review decisions.
+- **Author:** Submit content for audits and view permitted results.
+
+Requirements:
+
+1. Authenticate users securely and store passwords using an appropriate password-hashing algorithm if local password authentication is implemented.
+2. Enforce role permissions on the server for every protected operation.
+3. Return HTTP 401 for unauthenticated protected requests and HTTP 403 for authenticated users without sufficient permission.
+4. Obtain reviewer identity from the authenticated session, not a user-supplied name.
+5. Protect session cookies, sensitive operations and state-changing requests against common web security threats.
+6. Validate input, enforce least privilege and prevent users from changing their own roles without authorization.
+7. Keep secrets in environment variables or the hosting platform's secret manager.
+8. Provide a secure initial administrator setup procedure. Never hardcode production credentials.
+9. Preserve public access to harmless demo or read-only content where appropriate, while protecting sensitive write operations.
+10. Do not expose passwords, tokens, signing keys or private user data in API responses or logs.
+
+Add a clear login/logout experience that fits the existing interface. Do not redesign the entire application.
+
+## B. Durable database storage
+
+First establish whether the current database survives application restarts and redeployments.
+
+If the current deployment does not provide reliable persistence, implement a safe migration to a managed persistent database such as PostgreSQL, provided it is compatible with the existing hosting environment.
+
+Do not migrate unnecessarily if durable storage is already correctly configured.
+
+Requirements:
+
+- Use versioned database migrations.
+- Preserve facts, fact history, brand rules, assets, asset versions, audits, findings, passports, reviewer decisions, audit logs, source configurations and staged updates.
+- Maintain foreign-key relationships and appropriate indexes.
+- Use parameterized queries and transactions.
+- Back up data before migration.
+- Verify record counts, relationships and important historical records after migration.
+- Test persistence across restarts and redeployments.
+- Document backup, restore, migration and rollback procedures.
+
+Never reset the production database or overwrite real records with demonstration data.
+
+## C. Tamper-evident audit logs
+
+Upgrade the existing audit log into a verifiable hash-chained event history.
+
+Each event should contain the relevant fields:
+
+- Unique event identifier.
+- Timestamp.
+- Authenticated actor ID and role.
+- Action or event type.
+- Affected record type and ID.
+- Sanitized event metadata.
+- Previous event hash.
+- Current event hash.
+
+Use SHA-256 and a deterministic, documented canonical serialization format.
+
+Conceptually:
+
+`current_hash = SHA256(canonical_event_payload + previous_hash)`
+
+Define the exact canonical format and first-event representation consistently. Include chain identifiers where separate chains are necessary.
+
+Log security-relevant operations, including:
+
+- Authentication events where appropriate.
+- Fact and brand-rule changes.
+- Audit execution.
+- Reviewer decisions.
+- Role and permission changes.
+- Passport issuance and verification events.
+- Live-source synchronization.
+- Staged-update approvals and rejections.
+- Bulk revalidation outcomes.
+
+Security requirements:
+
+- Commit the relevant business change and audit event atomically.
+- Prevent ordinary users from modifying or deleting historical events.
+- Handle concurrent event creation safely.
+- Exclude passwords, access tokens, API keys and other secrets.
+- Implement a verification operation that detects modified payloads, invalid previous hashes, missing events and broken chain links.
+- Show verification results in the interface, with an explanation of detected inconsistencies.
+- Record the time of verification and the result without hiding or overwriting previous evidence of failure.
+
+A hash chain alone does not prevent a privileged attacker from rewriting an entire chain. Where practical, use periodic signed checkpoints or independently stored checkpoints to make wholesale history replacement more detectable.
+
+Use the accurate term **tamper-evident**, not absolutely immutable.
+
+## D. Cryptographically signed Trust Passports
+
+Upgrade the existing Trust Passport mechanism without breaking its current display, IDs, references or version lineage.
+
+Each newly issued passport must include a canonical signed payload covering the relevant audit information, including:
+
+- Passport ID and version.
+- Asset and audit references.
+- Verification findings and evidence references.
+- Governance score and status.
+- Reviewer decision and authenticated reviewer identity, where applicable.
+- Issue timestamp.
+- Relevant knowledge-base and brand-rule versions.
+
+Use a standard cryptographic library and a secure signing method. Prefer an asymmetric digital-signature scheme such as Ed25519 if compatible with the existing stack.
+
+Requirements:
+
+1. Sign the canonical passport payload on the server.
+2. Store the signature, algorithm, key ID and payload-format version.
+3. Keep private keys outside the repository and database.
+4. Support key rotation and retain the trusted public keys needed to verify older passports.
+5. Provide a public or appropriately accessible verification page/API that checks the signature against a trusted public key.
+6. Display `VALID`, `INVALID` or `UNVERIFIABLE` accurately.
+7. Ensure modifications to signed data cause verification to fail.
+8. Do not silently re-sign modified historical passports.
+9. Keep legacy passports accessible and label them `LEGACY — NOT SIGNED`; never falsely mark them as verified.
+
+A valid signature proves the integrity and origin of the signed payload relative to a trusted key. It does not prove that the original content or claims are factually correct.
+
+### Improvement 1 acceptance tests
+
+- Unauthorized write requests return 401.
+- Wrong-role requests return 403.
+- Reviewer identity cannot be forged.
+- Existing records survive restart and redeployment.
+- Modifying an audit event causes chain verification to fail.
+- Missing or reordered events are detected.
+- A newly signed passport verifies successfully.
+- Modifying signed passport data makes verification fail.
+- Legacy passports remain accessible.
+- Existing audit, review and knowledge-base workflows still work.
+
+---
+
+# PART 3 — IMPROVEMENT 2: MEASURED AND EXPLAINABLE VERIFICATION QUALITY
+
+## Objective
+
+Make EvidenceGuard's verification quality measurable and explainable using a reproducible benchmark, rather than presenting unverified accuracy claims.
+
+The current report states that verification accuracy has not yet been measured. The new Evaluation view must show genuine test results, explain how they were obtained and help detect regressions.
+
+## A. Create a labelled benchmark
+
+Create a version-controlled benchmark dataset, preferably JSON, containing at least:
+
+- 150 individually labelled claims.
+- Examples from all three classes: SUPPORTED, CONTRADICTED and UNVERIFIED.
+- At least 10 controlled fact-change scenarios.
+- Relevant approved facts, source references and expected outcomes.
+- Clear labels and explanations for each example.
+- Dataset version and evaluation metadata.
+
+Use the actual verification engine and realistic brand-governance examples.
+
+Do not fabricate evaluation results, label random predictions as ground truth, or report a hand-created score as measured accuracy.
+
+Ground-truth labels must be reviewed and documented. Include challenging cases such as:
+
+- Exact factual matches.
+- Numeric and pricing discrepancies.
+- Duration and guarantee discrepancies.
+- Unsupported claims.
+- Missing evidence.
+- Conflicting or expired facts.
+- Wording variations and paraphrases.
+- Claims affected by a change to an approved fact.
+
+Document the labelling rules, dataset limitations and any ambiguous examples.
+
+Keep the benchmark separate from production records and seeded demonstration data.
+
+## B. Implement a reproducible evaluation runner
+
+Add a command such as:
+
+`npm run eval`
+
+Use the existing package scripts and testing conventions wherever possible.
+
+The runner must:
+
+1. Load the versioned benchmark.
+2. Run the actual EvidenceGuard engine.
+3. Compare predictions with the labelled ground truth.
+4. Calculate and save the results.
+5. Record the evaluation timestamp, dataset version, engine version and relevant model configuration.
+6. Produce a machine-readable results file and a human-readable summary.
+7. Fail clearly when the dataset is invalid, incomplete or cannot be evaluated.
+
+When Gemini is used, record the relevant model identifier and configuration where available. Avoid exposing API keys. Keep deterministic evaluation separate from optional AI-assisted evaluation so that their results are not confused.
+
+## C. Calculate the required metrics correctly
+
+Implement the following metrics and document their definitions:
+
+- **Precision:** Of the claims predicted as a given class, the proportion correctly predicted.
+- **Recall:** Of the claims belonging to a given class in the labelled dataset, the proportion correctly identified.
+- **Change-impact recall:** Of the previously audited assets that should be revalidated after a controlled fact change, the proportion correctly flagged.
+- **False-alert rate:** The proportion of eligible negative/non-actionable cases incorrectly flagged, using an explicitly documented denominator.
+- **Traceability:** The proportion of findings for which the required evidence references and engine information are present and valid.
+- **Passport completeness:** The proportion of issued passports containing all required fields and valid references.
+
+Provide class-wise precision and recall for SUPPORTED, CONTRADICTED and UNVERIFIED. Include a confusion matrix.
+
+Handle zero denominators explicitly as `N/A`, not as misleading zero or perfect performance.
+
+Do not present confidence bands as calibrated probabilities unless calibration has been measured. If the current engine does not produce meaningful confidence estimates, use clearly labelled qualitative confidence bands based on documented rules and explain their limitations.
+
+## D. Add per-finding explanations
+
+Every finding should provide an understandable explanation showing:
+
+- The extracted claim.
+- The expected classification.
+- The actual classification.
+- The matched approved fact or explanation for missing evidence.
+- The relevant source and fact version.
+- The rule or comparison that influenced the result.
+- The engine used: deterministic, semantic/AI-assisted, or another explicitly documented method.
+- A confidence band only where supported by the implementation.
+- Why the result was marked SUPPORTED, CONTRADICTED or UNVERIFIED.
+
+Every SUPPORTED or CONTRADICTED finding must have a valid evidence reference and engine name. If evidence is missing, do not fabricate it; classify or flag the result appropriately.
+
+Keep explanations concise and understandable to non-technical reviewers.
+
+## E. Integrate the Evaluation dashboard
+
+Add to the existing Evaluation view rather than creating an unrelated replacement dashboard.
+
+Display:
+
+- Dataset size and version.
+- Number of evaluated claims and change scenarios.
+- Confusion matrix.
+- Class-wise precision and recall.
+- Change-impact recall.
+- False-alert rate.
+- Traceability and passport completeness.
+- Evaluation date and engine version.
+- A short limitations section.
+- Previous evaluation comparison where valid results exist.
+
+Include clear labels for measured results, pending evaluations and unavailable metrics.
+
+Only compare results produced using compatible datasets and evaluation configurations. Show when the benchmark or engine changes.
+
+Provide a way to rerun evaluation and view historical evaluation results, with appropriate access control.
+
+## F. Add regression protection
+
+Integrate the benchmark into automated tests or a documented evaluation workflow.
+
+Detect when changes to the verification engine materially reduce performance. Use configurable, justified thresholds; do not invent impressive targets and then manipulate labels to meet them.
+
+Keep unit tests, benchmark evaluation and live API integration tests distinct.
+
+### Improvement 2 acceptance tests
+
+- The benchmark contains at least 150 reviewed claims and 10 controlled change scenarios, or a documented approved adjustment.
+- The evaluation command runs reproducibly.
+- The confusion matrix and metrics are calculated from actual predictions and labels.
+- Metric denominators and edge cases are handled correctly.
+- Every applicable finding includes evidence references and engine information.
+- Historical evaluation results identify the dataset and engine version.
+- No fake accuracy numbers appear in the dashboard.
+- Existing EvidenceGuard classifications and audit workflows continue to work.
+
+---
+
+# PART 4 — IMPROVEMENT 3: SCHEDULED LIVE-SOURCE SYNC, ALERTS AND BULK REVALIDATION
+
+## Objective
+
+Extend the existing Live Sources / Connectors and staged-update workflow so authorised external changes can be detected on a schedule, reviewed safely and followed by revalidation of affected content.
+
+The current report already describes connector polling, hashing and staged updates, but a real external feed, reliable scheduling and automatic revalidation have not been established. Build on the existing connector framework rather than replacing it.
+
+## A. Connect at least one real authorised source
+
+Inspect the existing connector implementation first.
+
+Configure at least one genuine, authorised source, such as a public product catalogue API or a source for which the team has permission.
+
+The connector must:
+
+- Fetch data using an approved API or webhook.
+- Validate and normalise incoming payloads.
+- Map source fields to the relevant approved facts.
+- Record the source, fetch time and freshness state.
+- Handle pagination or rate limits if required.
+- Use timeouts, bounded retries and clear error handling.
+- Protect credentials using secret management.
+- Retain existing URL validation and SSRF protections.
+- Never access arbitrary internal network addresses or private infrastructure.
+
+Do not treat a local mock feed as a real external integration. Mock data may be used for tests, but label it clearly.
+
+If credentials or a permitted source are unavailable, build a configurable connector interface, test it with a mock and clearly state that the live integration is pending. Do not invent successful sync results.
+
+## B. Implement reliable scheduled synchronization
+
+Use the scheduling approach appropriate for the existing hosting environment.
+
+For a Cloud Run deployment, prefer a managed scheduler such as Cloud Scheduler calling a protected backend endpoint when that fits the deployment architecture. Do not rely on an in-process timer that may stop or duplicate work across container instances.
+
+Requirements:
+
+- Configurable sync frequency.
+- Protected scheduler endpoint.
+- Authenticated scheduler requests.
+- Safe retry handling.
+- Idempotent sync execution.
+- Last successful sync timestamp.
+- Next scheduled run where available.
+- Sync status: `HEALTHY`, `STALE` or `ERROR`.
+- Clear operational logs and failure reasons.
+- A manual Sync Now action for authorised users.
+- Protection against overlapping or duplicated sync jobs.
+
+Use the existing SHA-256 payload hashing where appropriate. Unchanged source payloads must not create duplicate staged updates.
+
+Store sync-run history so reviewers can see what happened and when.
+
+## C. Add staged updates and notifications
+
+When a source changes an approved fact:
+
+1. Normalise the source data.
+2. Compare it with the last known source version.
+3. Detect actual changes using stable hashing and field comparisons.
+4. Create a staged update linked to its source and proposed fact changes.
+5. Show the old and proposed values.
+6. Record source metadata and a concise change explanation.
+7. Notify the appropriate authorised reviewers.
+8. Require human approval before modifying approved facts.
+
+When a source fails:
+
+- Mark it `ERROR` or `STALE` according to documented rules.
+- Preserve the last known good data.
+- Record the failure reason and timestamp.
+- Raise a visible alert.
+- Avoid repeated notifications for the same unresolved incident.
+- Provide a recovery path when the source becomes healthy again.
+
+Implement at least one practical notification channel, such as a configured webhook or email provider. Use secrets for credentials and make the notification channel configurable. Do not expose secrets or claim that notifications were delivered unless delivery was confirmed.
+
+## D. Implement one-click bulk revalidation
+
+Extend the existing Brand Time Machine and audit pipeline.
+
+When an authorised reviewer approves a staged fact update:
+
+1. Apply the approved change using the existing fact-versioning logic.
+2. Run the existing change-impact detection.
+3. Identify previously audited assets that require revalidation.
+4. Add those assets to a durable revalidation queue.
+5. Allow an authorised reviewer to start bulk revalidation.
+6. Reuse the existing EvidenceGuard pipeline for each asset.
+7. Save results as new audit runs and appropriate asset versions.
+8. Preserve the link to the original audit and Trust Passport.
+9. Generate a new passport using the secure signing workflow from Improvement 1.
+10. Display before-and-after findings and governance scores.
+
+The bulk operation must be safe to retry. A retry must not create duplicate audit runs or passports for an already completed job unless the user explicitly starts a new run.
+
+Show job status such as `QUEUED`, `RUNNING`, `COMPLETED`, `PARTIALLY_FAILED` or `FAILED`.
+
+For each asset, display:
+
+- Previous verification status and score.
+- New verification status and score.
+- Findings that were resolved.
+- New or changed findings.
+- Relevant fact versions and evidence references.
+- Revalidation timestamp.
+- Error details if revalidation failed.
+
+Provide filters for affected assets, status and job state. Let reviewers inspect individual results and retry failed items safely.
+
+Do not silently approve content or publish revised marketing content automatically. Human review remains the final decision.
+
+## E. Add a Live Sync and Revalidation dashboard
+
+Integrate with the existing Live Sources, dashboard and review queue.
+
+Display:
+
+- Configured sources and their health.
+- Last successful sync and latest attempt.
+- New or pending staged updates.
+- Source errors and stale-source alerts.
+- Affected asset count.
+- Pending, running, completed and failed revalidation jobs.
+- Before-and-after comparison access.
+- Manual sync and bulk revalidation controls for authorised users.
+
+Use actual database state. Never display hardcoded live counts, fake notifications or simulated successful syncs as production results.
+
+### Improvement 3 acceptance tests
+
+- At least one authorised real source syncs successfully on schedule when credentials and infrastructure are available.
+- The scheduling configuration and run history are visible.
+- Repeated identical payloads do not create duplicate staged updates.
+- A failing source transitions to `ERROR` or `STALE` and raises an alert.
+- Last known good data remains intact after failure.
+- Approval of a staged update creates the correct revalidation items.
+- Bulk revalidation reuses the existing audit engine and records before-and-after results.
+- Failed jobs can be retried without duplicating completed results.
+- Existing manual audits, staged approvals and Brand Time Machine behaviour remain intact.
+
+For the report's seven-consecutive-day sync criterion, implement the scheduler and monitoring first, then collect seven days of genuine run history. Do not claim the criterion is met before that period has elapsed.
+
+---
+
+# PART 5 — UNIFY THE THREE IMPROVEMENTS INTO ONE COHERENT PRODUCT
+
+The improvements must work together as one platform, not three isolated demos.
+
+Implement this end-to-end workflow:
+
+**Authorised source changes → scheduled sync detects the change → reviewer receives an alert → proposed fact update is staged → reviewer approves or rejects it → Brand Time Machine identifies affected assets → bulk revalidation runs EvidenceGuard → before-and-after results are displayed → a new Trust Passport is signed → every important action is recorded in the tamper-evident audit log → evaluation results help measure verification quality.**
+
+Requirements:
+
+- Use shared database records and consistent identifiers.
+- Preserve audit and passport lineage.
+- Record important actions with authenticated actors.
+- Ensure that errors in one subsystem do not corrupt another.
+- Use durable jobs for long-running operations.
+- Provide meaningful error messages and recovery options.
+- Never bypass human approval of staged fact changes.
+- Never use fabricated data to simulate a completed workflow.
+
+This connected workflow should become the centrepiece of the Round 3 demonstration.
+
+---
+
+# PART 6 — DESIGN AND USER EXPERIENCE
+
+Preserve the current BrandPulse Sentinel AI visual identity, navigation, typography, colours and existing page structure.
+
+Do not redesign working screens just to make them look different.
+
+Make targeted improvements:
+
+- Add a clear Security and Audit Integrity section.
+- Add an Evaluation dashboard with real metrics and explanations.
+- Enhance Live Sources with sync status, alerts and run history.
+- Add a bulk-revalidation queue and before-and-after comparison.
+- Add accessible status labels, useful empty states and loading indicators.
+- Make all new components responsive and keyboard-accessible.
+- Display concise explanations for errors, permissions and verification states.
+- Keep important actions easy for judges to find.
+- Avoid excessive animations, decorative charts and unnecessary AI-generated text.
+
+Use real backend data for every metric, count, alert and status.
+
+The application must look polished, but functional correctness is more important than visual decoration.
+
+---
+
+# PART 7 — SECURITY, RELIABILITY AND TESTING
+
+Add automated unit, integration and regression tests.
+
+Test:
+
+- Authentication, session handling and role permissions.
+- Database migration, backup and restoration.
+- Audit-chain creation and tamper detection.
+- Trust Passport signing and verification.
+- Benchmark integrity, metric calculations and reproducibility.
+- Connector authentication, validation, timeout and retry behaviour.
+- Scheduler authentication and duplicate-run prevention.
+- Staged-update approval and rejection.
+- Alert deduplication and source recovery.
+- Bulk revalidation, retries and partial failures.
+- API validation, error responses and access control.
+- Existing application features and API contracts.
+
+Run the complete existing test suite after each major integration.
+
+Do not delete, skip or weaken existing tests to obtain a passing build. Investigate regressions and document pre-existing failures separately.
+
+Check for:
+
+- Exposed credentials or private keys.
+- Unauthorised write endpoints.
+- SQL injection risks.
+- Unsafe external URL fetching.
+- Missing input validation.
+- Race conditions and duplicate background jobs.
+- Unbounded retries or excessive API calls.
+- Incomplete database migrations.
+- Sensitive information in logs.
+
+Add operational logging without leaking secrets.
+
+---
+
+# PART 8 — DEPLOYMENT AND DATA SAFETY
+
+Use the current project's supported deployment process.
+
+Before deploying:
+
+1. Run the production build.
+2. Run all existing and new tests.
+3. Validate the database migration on a backup or staging copy.
+4. Confirm environment variables and secret configuration.
+5. Confirm that scheduler authentication and public endpoints are correctly protected.
+6. Verify that all existing workflows still function.
+7. Prepare rollback instructions and confirm how to restore the database.
+8. Obtain my explicit deployment approval.
+
+Never automatically overwrite the live database or deploy an untested migration.
+
+If the AI Studio environment does not support a required production service, explain the limitation and provide the smallest compatible alternative. Do not claim that scheduled jobs, persistent storage, email notifications or external integrations work unless they have been verified in the actual deployment.
+
+---
+
+# PART 9 — REQUIRED DELIVERABLES
+
+After implementation, provide:
+
+1. A summary of the original functionality preserved.
+2. A list of files changed and why.
+3. The database schema changes and migration instructions.
+4. The authentication role matrix.
+5. The audit-chain verification design and test results.
+6. The Trust Passport signing and verification instructions.
+7. The benchmark dataset, labelling methodology and evaluation command.
+8. The actual confusion matrix and measured metrics, with dataset and engine versions.
+9. The configured source, scheduler setup and sync history.
+10. The notification configuration and delivery test, if implemented.
+11. The bulk-revalidation workflow and before-and-after demonstration.
+12. The complete test and production-build results.
+13. Required environment variables, documented without exposing secret values.
+14. Backup, recovery and rollback instructions.
+15. A list of incomplete features and remaining risks.
+16. A short judge demonstration script.
+17. Confirmation of whether the deployed website was actually tested.
+
+Do not claim any feature is complete based only on code generation. Confirm that it builds, runs, passes its relevant tests and works through the real user interface.
+
+---
+
+# PART 10 — JUDGE-READY DEMONSTRATION
+
+Prepare a repeatable five-minute demonstration using real test records.
+
+### Demonstration sequence
+
+**Step 1 — Run a baseline audit**
+
+Submit a sample marketing asset. Show claim-level verification, evidence references, the governance score and the Trust Passport.
+
+**Step 2 — Show measurable quality**
+
+Open Evaluation. Show the benchmark version, confusion matrix and actual measured metrics. Explain one finding using its evidence, engine and classification rationale.
+
+**Step 3 — Demonstrate source monitoring**
+
+Run or show a verified scheduled sync. Introduce a controlled change in the authorised test source and show how the system detects it without creating duplicate updates.
+
+**Step 4 — Demonstrate human governance**
+
+Show the staged change, compare old and proposed values, and approve it using an authenticated reviewer account.
+
+**Step 5 — Revalidate affected content**
+
+Open the revalidation queue, run bulk revalidation and show the before-and-after results for affected assets.
+
+**Step 6 — Prove record integrity**
+
+Verify the new Trust Passport and audit chain. In a test-only environment, demonstrate that changing a signed payload or audit event is detected. Never tamper with production records for the demonstration.
+
+Conclude with a concise explanation of how security, measured verification and scheduled monitoring work together.
+
+Use clearly identified test data when necessary. Do not present a mock source or simulated result as a real production integration.
+
+---
+
+# FINAL EXECUTION INSTRUCTIONS
+
+Work in the following order:
+
+**Stage 1:** Inspect the existing codebase and run baseline tests. Produce a feature inventory, risk assessment and implementation plan. Do not modify files.
+
+**Stage 2:** Wait for my approval.
+
+**Stage 3:** Implement Improvement 1 in small steps, with migration safety and regression tests.
+
+**Stage 4:** Implement Improvement 2, ensuring that all reported metrics come from real labelled benchmark data and actual engine predictions.
+
+**Stage 5:** Implement Improvement 3 by extending the existing connector, staged-update and Brand Time Machine workflows.
+
+**Stage 6:** Integrate the three improvements, test the complete end-to-end journey, and fix regressions.
+
+**Stage 7:** Prepare the judge demonstration, documentation and deployment plan. Wait for approval before deploying.
+
+If a dependency or infrastructure requirement blocks an improvement, explain the issue and propose the smallest safe solution. Never silently skip a requirement.
+
+## Definition of success
+
+The final result must remain recognisably the same working BrandPulse Sentinel AI application, but with:
+
+- Authenticated users and enforced role permissions.
+- Durable governance records and verifiable tamper-evident logs.
+- Cryptographically verifiable Trust Passports.
+- A real, reproducible and explainable verification benchmark.
+- Scheduled authorised source synchronisation and meaningful alerts.
+- Human-approved staged updates and reliable bulk revalidation.
+- Tested integration across all three improvements.
+- No fabricated metrics, fake live status, lost records or broken existing workflows.
+
+**Build a credible, evidence-based and technically defensible hackathon project. Preserve working functionality first, implement safely second, and polish the demonstration last.**

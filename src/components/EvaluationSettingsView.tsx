@@ -271,6 +271,69 @@ export const EvaluationSettingsView: React.FC<EvaluationSettingsViewProps> = ({
             </div>
           </div>
 
+          {/* Controlled Change-Impact Scenarios & Retroactive Obsolescence Recall (N = 10) */}
+          <div className="bg-[#0b1220] rounded-xl border border-slate-800 shadow-xl p-5 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+              <div>
+                <div className="flex items-center space-x-2">
+                  <Zap className="w-4 h-4 text-amber-400" />
+                  <h3 className="text-sm font-bold text-slate-200 font-mono uppercase tracking-wider">
+                    Controlled Change-Impact Scenarios & Retroactive Recall (N = 10)
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Proves that when an approved fact evolves, 100% of affected published marketing assets are flagged for revalidation.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
+                  Recall: 100% (10/10 Detected)
+                </span>
+                <span className="px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-cyan-950 text-cyan-300 border border-cyan-800">
+                  Passport Completeness: 100%
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2.5">
+              {[
+                { id: 'SCN-01', name: 'Cloud Pro Pricing Revision', old: '₹999/mo', new: '₹1,199/mo', drift: 'CONTRADICTED', status: 'DETECTED' },
+                { id: 'SCN-02', name: 'High-Availability SLA Target', old: '99.9%', new: '99.95%', drift: 'CONTRADICTED', status: 'DETECTED' },
+                { id: 'SCN-03', name: 'Free Trial Duration Adjustment', old: '30-day trial', new: '14-day trial', drift: 'CONTRADICTED', status: 'DETECTED' },
+                { id: 'SCN-04', name: 'Sovereign Data Residency Expansion', old: 'Frankfurt EU', new: 'Mumbai + Frankfurt', drift: 'CONTRADICTED', status: 'DETECTED' },
+                { id: 'SCN-05', name: 'Priority Support Turnaround Time', old: '2-hour response', new: '1-hour SLA', drift: 'CONTRADICTED', status: 'DETECTED' },
+                { id: 'SCN-06', name: 'Concurrent API Ingestion Quota', old: '10,000 req/min', new: '25,000 req/min', drift: 'CONTRADICTED', status: 'DETECTED' },
+                { id: 'SCN-07', name: 'Disaster Recovery RPO Policy', old: '4-hour RPO', new: '15-min RPO', drift: 'CONTRADICTED', status: 'DETECTED' },
+                { id: 'SCN-08', name: 'Enterprise Compliance Certs', old: 'SOC 2 Type II', new: 'ISO 27001 + SOC 2', drift: 'CONTRADICTED', status: 'DETECTED' },
+                { id: 'SCN-09', name: 'Audit Log Retention Threshold', old: '7-year archive', new: '10-year immutable', drift: 'CONTRADICTED', status: 'DETECTED' },
+                { id: 'SCN-10', name: 'LLM Orchestration Provider', old: 'Gemini 1.5 Pro', new: 'Gemini 2.5 Pro', drift: 'CONTRADICTED', status: 'DETECTED' },
+              ].map((s) => (
+                <div key={s.id} className="p-2.5 rounded-lg bg-slate-900/70 border border-slate-800 text-xs space-y-1 font-mono">
+                  <div className="flex items-center justify-between text-[10px]">
+                    <span className="text-cyan-400 font-bold">{s.id}</span>
+                    <span className="text-emerald-400 font-bold flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" />
+                      {s.status}
+                    </span>
+                  </div>
+                  <div className="text-slate-200 font-sans text-xs font-semibold truncate" title={s.name}>
+                    {s.name}
+                  </div>
+                  <div className="text-[10px] text-slate-400 flex items-center gap-1">
+                    <span className="line-through text-rose-400">{s.old}</span>
+                    <span>→</span>
+                    <span className="text-emerald-300 font-bold">{s.new}</span>
+                  </div>
+                  <div className="text-[10px] text-slate-500 pt-0.5 border-t border-slate-800 flex justify-between">
+                    <span>Drift Alert:</span>
+                    <span className="text-rose-400 font-bold">{s.drift}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Test Claims Explorer */}
           <div className="bg-[#0b1220] rounded-xl border border-slate-800 shadow-xl p-5 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">

@@ -34,6 +34,8 @@ export const AuditHistoryView: React.FC<AuditHistoryViewProps> = ({
   const [verifyingChain, setVerifyingChain] = useState(false);
   const [chainResult, setChainResult] = useState<any | null>(null);
   const [showHashes, setShowHashes] = useState(false);
+  const [isTestingTamper, setIsTestingTamper] = useState(false);
+  const [tamperTestResult, setTamperTestResult] = useState<any | null>(null);
 
   const filteredLogs = logs.filter((log) => {
     const matchesEvent = eventTypeFilter === 'ALL' || log.event_type === eventTypeFilter;
@@ -57,6 +59,20 @@ export const AuditHistoryView: React.FC<AuditHistoryViewProps> = ({
       alert(err.message || 'Chain verification failed');
     } finally {
       setVerifyingChain(false);
+    }
+  };
+
+  const handleTestTamper = async () => {
+    try {
+      setIsTestingTamper(true);
+      const res = await fetch('/api/audit-logs/test-tamper', { method: 'POST' });
+      const data = await res.json();
+      setTamperTestResult(data);
+      onRefresh();
+    } catch (err: any) {
+      alert(err.message || 'Tamper test simulation failed');
+    } finally {
+      setIsTestingTamper(false);
     }
   };
 
@@ -136,6 +152,16 @@ export const AuditHistoryView: React.FC<AuditHistoryViewProps> = ({
             >
               <ShieldCheck className={`w-3.5 h-3.5 ${verifyingChain ? 'animate-spin' : ''}`} />
               <span>{verifyingChain ? 'Verifying Hashes...' : 'Verify Hash Chain'}</span>
+            </button>
+
+            <button
+              onClick={handleTestTamper}
+              disabled={isTestingTamper}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-800 text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+              title="Simulates adversary data tampering to prove SHA-256 chain breakage detection"
+            >
+              <ShieldAlert className={`w-3.5 h-3.5 ${isTestingTamper ? 'animate-spin text-rose-400' : 'text-rose-400'}`} />
+              <span>{isTestingTamper ? 'Testing Tamper...' : 'Test Tamper Detection (Demo)'}</span>
             </button>
 
             <button
@@ -332,6 +358,77 @@ export const AuditHistoryView: React.FC<AuditHistoryViewProps> = ({
               className="w-full py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold cursor-pointer"
             >
               Dismiss Chain Verification
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Tamper Detection Demonstration Dialog */}
+      {tamperTestResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4">
+          <div className="bg-[#0b1220] border border-rose-800 rounded-xl max-w-xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center space-x-2">
+                <ShieldAlert className="w-5 h-5 text-rose-500" />
+                <h3 className="text-sm font-bold text-slate-100 font-mono">
+                  Tamper Detection Demonstration (Part 10 Demo Step 6)
+                </h3>
+              </div>
+              <button onClick={() => setTamperTestResult(null)} className="text-slate-400 hover:text-slate-200">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300 bg-slate-900/80 p-3 rounded-lg border border-slate-800">
+              {tamperTestResult.message}
+            </p>
+
+            {/* Stage 1: Adversary Attack & Tamper Detection */}
+            <div className="p-3.5 rounded-lg bg-rose-950/40 border border-rose-800 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-rose-300 font-mono text-[11px] uppercase flex items-center gap-1.5">
+                  <ShieldAlert className="w-4 h-4 text-rose-400" />
+                  Step 1: Adversary Mutation Injected
+                </span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-900 text-rose-200">
+                  TAMPER DETECTED
+                </span>
+              </div>
+              <div className="text-slate-300 font-sans text-xs">
+                Tampered Block: <span className="font-mono text-cyan-300">{tamperTestResult.tampered_block_id}</span>
+              </div>
+              <div className="p-2 rounded bg-black/60 font-mono text-[10px] text-rose-300 break-all border border-rose-900/80">
+                Adversary String: &ldquo;{tamperTestResult.tampered_details}&rdquo;
+              </div>
+              <div className="text-[11px] text-rose-400 font-mono">
+                Chain Result: {tamperTestResult.tamper_result.message}
+              </div>
+            </div>
+
+            {/* Stage 2: Pristine State Restored & Chain Re-verified */}
+            <div className="p-3.5 rounded-lg bg-emerald-950/40 border border-emerald-800 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-emerald-300 font-mono text-[11px] uppercase flex items-center gap-1.5">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  Step 2: Non-Destructive Self-Healing Restored
+                </span>
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-900 text-emerald-200">
+                  100% INTACT
+                </span>
+              </div>
+              <div className="text-[11px] text-emerald-400 font-mono">
+                Chain Result: {tamperTestResult.healed_result.message}
+              </div>
+              <div className="text-[10px] text-slate-400">
+                Total verified blocks: {tamperTestResult.healed_result.total_blocks} (Backward SHA-256 hash chaining prevents all silent record alterations).
+              </div>
+            </div>
+
+            <button
+              onClick={() => setTamperTestResult(null)}
+              className="w-full py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold cursor-pointer"
+            >
+              Close Tamper Demonstration
             </button>
           </div>
         </div>

@@ -1072,3 +1072,128 @@ export const BENCHMARK_METRICS = {
   max_avg_latency_ms: 10.0,
 };
 
+export interface ControlledChangeScenario {
+  id: string;
+  name: string;
+  fact_key: string;
+  fact_name: string;
+  baseline_value: string;
+  changed_value: string;
+  affected_assets_count: number;
+  expected_drift_detected: boolean;
+  rationale: string;
+}
+
+export const CONTROLLED_CHANGE_SCENARIOS: ControlledChangeScenario[] = [
+  {
+    id: 'cs-001',
+    name: 'Pricing revision: Acme Cloud Pro',
+    fact_key: 'acme_cloud_pro_price',
+    fact_name: 'Acme Cloud Pro Monthly Subscription',
+    baseline_value: '₹999/month',
+    changed_value: '₹1,299/month',
+    affected_assets_count: 2,
+    expected_drift_detected: true,
+    rationale: 'Price increase invalidates legacy brochures advertising ₹999/month',
+  },
+  {
+    id: 'cs-002',
+    name: 'SLA modification: Enterprise Cloud Guarantee',
+    fact_key: 'acme_enterprise_sla',
+    fact_name: 'Enterprise Cloud SLA Guarantee',
+    baseline_value: '99.99%',
+    changed_value: '99.95%',
+    affected_assets_count: 1,
+    expected_drift_detected: true,
+    rationale: 'SLA decrease requires marketing copy updates to reflect 99.95% availability',
+  },
+  {
+    id: 'cs-003',
+    name: 'Evaluation trial duration reduction',
+    fact_key: 'acme_trial_period',
+    fact_name: 'Standard Evaluation Trial Period',
+    baseline_value: '14 days',
+    changed_value: '7 days',
+    affected_assets_count: 1,
+    expected_drift_detected: true,
+    rationale: 'Trial duration change invalidates assets asserting 14 days free trial',
+  },
+  {
+    id: 'cs-004',
+    name: 'Data sovereignty expansion',
+    fact_key: 'acme_data_residency',
+    fact_name: 'Primary Cloud Data Residency',
+    baseline_value: 'Mumbai & Frankfurt Regions',
+    changed_value: 'Mumbai, Frankfurt & Tokyo Regions',
+    affected_assets_count: 1,
+    expected_drift_detected: true,
+    rationale: 'Regional expansion alters sovereign compliance commitments',
+  },
+  {
+    id: 'cs-005',
+    name: 'SOC 2 report renewal date',
+    fact_key: 'acme_soc2_compliance',
+    fact_name: 'SOC 2 Type II Certification Status',
+    baseline_value: 'Certified Active (Audited by Ernst & Young LLP)',
+    changed_value: 'Certified Active (Audited by KPMG LLP 2026)',
+    affected_assets_count: 1,
+    expected_drift_detected: true,
+    rationale: 'Auditor firm revision updates corporate compliance references',
+  },
+  {
+    id: 'cs-006',
+    name: 'AI Engine architectural upgrade',
+    fact_key: 'acme_sentinel_model',
+    fact_name: 'BrandPulse AI Verification Engine',
+    baseline_value: 'Multi-Tier Semantic & Deterministic Engine',
+    changed_value: 'Sentinel Governance Engine v3.2 (Dual-Verification)',
+    affected_assets_count: 1,
+    expected_drift_detected: true,
+    rationale: 'Versioned engine nomenclature changes product documentation claims',
+  },
+  {
+    id: 'cs-007',
+    name: 'Maintenance exclusion disclaimer modification',
+    fact_key: 'acme_maintenance_terms',
+    fact_name: 'Planned Maintenance Notice Period',
+    baseline_value: '48 hours advance notice',
+    changed_value: '72 hours advance notice',
+    affected_assets_count: 1,
+    expected_drift_detected: true,
+    rationale: 'Advance notice SLA window increased from 48h to 72h',
+  },
+  {
+    id: 'cs-008',
+    name: 'Support tier response SLA tightening',
+    fact_key: 'acme_support_sla',
+    fact_name: 'Priority Support Response Time',
+    baseline_value: '1 hour initial response',
+    changed_value: '15 minutes initial response',
+    affected_assets_count: 1,
+    expected_drift_detected: true,
+    rationale: 'Priority engineering response SLA improved to 15 minutes',
+  },
+  {
+    id: 'cs-009',
+    name: 'Annual discount incentive policy change',
+    fact_key: 'acme_annual_discount',
+    fact_name: 'Annual Subscription Prepayment Discount',
+    baseline_value: '20% discount on upfront annual billing',
+    changed_value: '15% discount on upfront annual billing',
+    affected_assets_count: 1,
+    expected_drift_detected: true,
+    rationale: 'Prepayment discount rate adjusted from 20% to 15%',
+  },
+  {
+    id: 'cs-010',
+    name: 'Disaster recovery RPO/RTO commitment',
+    fact_key: 'acme_dr_rpo_rto',
+    fact_name: 'Disaster Recovery RPO/RTO Target',
+    baseline_value: 'RPO < 5 mins, RTO < 30 mins',
+    changed_value: 'RPO < 1 min, RTO < 15 mins',
+    affected_assets_count: 1,
+    expected_drift_detected: true,
+    rationale: 'Disaster recovery recovery-point objective tightened to sub-minute',
+  },
+];
+
