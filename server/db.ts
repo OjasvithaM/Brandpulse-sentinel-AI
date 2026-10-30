@@ -4,12 +4,25 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 
 const DB_DIR = path.resolve(process.cwd(), 'data');
-if (!fs.existsSync(DB_DIR)) {
-  fs.mkdirSync(DB_DIR, { recursive: true });
+const DB_PATH = process.env.DATABASE_PATH ? path.resolve(process.env.DATABASE_PATH) : path.join(DB_DIR, 'brandpulse.db');
+const targetDir = path.dirname(DB_PATH);
+if (!fs.existsSync(targetDir)) {
+  fs.mkdirSync(targetDir, { recursive: true });
 }
 
-const DB_PATH = path.join(DB_DIR, 'brandpulse.db');
 export const db = new DatabaseSync(DB_PATH);
+
+if (process.env.NODE_ENV === 'production') {
+  if (
+    !process.env.PASSPORT_SIGNING_SECRET ||
+    process.env.PASSPORT_SIGNING_SECRET === 'brandpulse-sentinel-master-secret-key-2026-acme-governance'
+  ) {
+    console.error(
+      'FATAL [BrandPulse Sentinel Security]: In production environment, PASSPORT_SIGNING_SECRET must be configured with a secure, non-default secret key.'
+    );
+    process.exit(1);
+  }
+}
 
 const PASSPORT_SECRET = process.env.PASSPORT_SIGNING_SECRET || 'brandpulse-sentinel-master-secret-key-2026-acme-governance';
 const GENESIS_HASH = 'GENESIS_0000000000000000000000000000000000000000000000000000000000000000';
@@ -266,6 +279,26 @@ export function verifyPassportSignature(passportIdOrCode: string): {
   };
 }
 
+export function serializeAuditBlockPayload(payload: {
+  eventType: string;
+  actor: string;
+  actorRole: string;
+  targetType: string;
+  targetId: string;
+  details: string;
+  timestamp: string;
+}): string {
+  return JSON.stringify({
+    eventType: payload.eventType,
+    actor: payload.actor,
+    actorRole: payload.actorRole,
+    targetType: payload.targetType,
+    targetId: payload.targetId,
+    details: payload.details,
+    now: payload.timestamp,
+  });
+}
+
 export function logAuditEventWithChain(
   eventType: string,
   actor: string,
@@ -278,22 +311,37 @@ export function logAuditEventWithChain(
     const id = `log-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
     const now = new Date().toISOString();
 
-    // Get previous block hash
-    const latestLog = db
-      .prepare('SELECT chain_hash FROM audit_logs WHERE chain_hash IS NOT NULL ORDER BY created_at DESC LIMIT 1')
-      .get() as any;
-    const prevHash = latestLog?.chain_hash || GENESIS_HASH;
+    db.exec('BEGIN IMMEDIATE;');
+    try {
+      // Get previous block hash atomically
+      const latestLog = db
+        .prepare('SELECT chain_hash FROM audit_logs WHERE chain_hash IS NOT NULL ORDER BY created_at DESC, id DESC LIMIT 1')
+        .get() as any;
+      const prevHash = latestLog?.chain_hash || GENESIS_HASH;
 
-    const payloadObj = { eventType, actor, actorRole, targetType, targetId, details, now };
-    const payloadHash = computeSha256(JSON.stringify(payloadObj));
-    const chainHash = computeSha256(`${prevHash}:${payloadHash}:${now}`);
+      const serializedPayload = serializeAuditBlockPayload({
+        eventType,
+        actor,
+        actorRole,
+        targetType,
+        targetId,
+        details,
+        timestamp: now,
+      });
+      const payloadHash = computeSha256(serializedPayload);
+      const chainHash = computeSha256(`${prevHash}:${payloadHash}:${now}`);
 
-    db.prepare(`
-      INSERT INTO audit_logs (id, event_type, actor, actor_role, target_type, target_id, details, created_at, prev_hash, payload_hash, chain_hash)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, eventType, actor, actorRole, targetType, targetId, details, now, prevHash, payloadHash, chainHash);
+      db.prepare(`
+        INSERT INTO audit_logs (id, event_type, actor, actor_role, target_type, target_id, details, created_at, prev_hash, payload_hash, chain_hash)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(id, eventType, actor, actorRole, targetType, targetId, details, now, prevHash, payloadHash, chainHash);
 
-    return { id, eventType, actor, actorRole, targetType, targetId, details, now, prevHash, payloadHash, chainHash };
+      db.exec('COMMIT;');
+      return { id, eventType, actor, actorRole, targetType, targetId, details, now, prevHash, payloadHash, chainHash };
+    } catch (txErr) {
+      db.exec('ROLLBACK;');
+      throw txErr;
+    }
   } catch (e) {
     console.error('Failed to log hash-chained audit event:', e);
     return null;
@@ -309,7 +357,8 @@ export function verifyAuditLogChain(): {
   message: string;
   verified_blocks: any[];
 } {
-  const logs = db.prepare('SELECT * FROM audit_logs ORDER BY created_at ASC').all() as any[];
+  // Query audit logs in sequential chain order without mutating database
+  const logs = db.prepare('SELECT * FROM audit_logs ORDER BY created_at ASC, id ASC').all() as any[];
   if (logs.length === 0) {
     return {
       valid: true,
@@ -326,30 +375,49 @@ export function verifyAuditLogChain(): {
 
   for (let i = 0; i < logs.length; i++) {
     const block = logs[i];
-    // If block doesn't have chain_hash yet (legacy log), heal/compute it
-    if (!block.chain_hash) {
-      const payloadObj = {
+
+    // If block doesn't have chain_hash yet (legacy log), record as legacy without mutating DB
+    if (!block.chain_hash || !block.payload_hash) {
+      verifiedBlocks.push({
+        id: block.id,
+        event_type: block.event_type,
+        actor: block.actor,
+        timestamp: block.created_at,
+        prev_hash: block.prev_hash || null,
+        chain_hash: null,
+        verified: false,
+        status: 'LEGACY_UNHASHED',
+        note: 'Historical log block recorded prior to cryptographic chain activation.',
+      });
+      continue;
+    }
+
+    // 1. Recompute payload hash directly from stored database columns to detect field tampering
+    const computedPayloadHash = computeSha256(
+      serializeAuditBlockPayload({
         eventType: block.event_type,
         actor: block.actor,
         actorRole: block.actor_role,
         targetType: block.target_type,
         targetId: block.target_id,
         details: block.details,
-        now: block.created_at,
+        timestamp: block.created_at,
+      })
+    );
+
+    if (block.payload_hash !== computedPayloadHash) {
+      return {
+        valid: false,
+        total_blocks: logs.length,
+        genesis_hash: GENESIS_HASH,
+        latest_hash: logs[logs.length - 1]?.chain_hash || '',
+        broken_block_id: block.id,
+        message: `Payload tamper detected at block ${block.id}: stored payload hash (${block.payload_hash}) does not match recomputed data hash (${computedPayloadHash}). Block details, actor, or event type have been altered.`,
+        verified_blocks: verifiedBlocks,
       };
-      const pHash = computeSha256(JSON.stringify(payloadObj));
-      const cHash = computeSha256(`${expectedPrevHash}:${pHash}:${block.created_at}`);
-      db.prepare('UPDATE audit_logs SET prev_hash = ?, payload_hash = ?, chain_hash = ? WHERE id = ?').run(
-        expectedPrevHash,
-        pHash,
-        cHash,
-        block.id
-      );
-      block.prev_hash = expectedPrevHash;
-      block.payload_hash = pHash;
-      block.chain_hash = cHash;
     }
 
+    // 2. Verify previous hash pointer integrity
     if (block.prev_hash !== expectedPrevHash) {
       return {
         valid: false,
@@ -357,7 +425,21 @@ export function verifyAuditLogChain(): {
         genesis_hash: GENESIS_HASH,
         latest_hash: logs[logs.length - 1]?.chain_hash || '',
         broken_block_id: block.id,
-        message: `Broken chain detected at block ${block.id}: expected prev_hash ${expectedPrevHash}, found ${block.prev_hash}`,
+        message: `Broken chain detected at block ${block.id}: expected prev_hash ${expectedPrevHash}, found ${block.prev_hash}. Records may have been deleted, inserted, or reordered.`,
+        verified_blocks: verifiedBlocks,
+      };
+    }
+
+    // 3. Recompute chain hash
+    const computedChainHash = computeSha256(`${expectedPrevHash}:${block.payload_hash}:${block.created_at}`);
+    if (block.chain_hash !== computedChainHash) {
+      return {
+        valid: false,
+        total_blocks: logs.length,
+        genesis_hash: GENESIS_HASH,
+        latest_hash: logs[logs.length - 1]?.chain_hash || '',
+        broken_block_id: block.id,
+        message: `Chain hash integrity failure at block ${block.id}: stored chain hash does not match computed digest.`,
         verified_blocks: verifiedBlocks,
       };
     }
@@ -371,6 +453,7 @@ export function verifyAuditLogChain(): {
       prev_hash: block.prev_hash,
       chain_hash: block.chain_hash,
       verified: true,
+      status: 'VERIFIED',
     });
   }
 
@@ -1159,11 +1242,23 @@ export function seedDemoData() {
     WHERE id = ?
   `).run(initialSig.signature, initialSig.signature_algorithm, initialSig.key_id, initialSig.payload_digest, initialSig.signed_at, passportId);
 
-  // 4. Seed Initial Audit Log
+  // 4. Seed Initial Cryptographically Chained Audit Logs
   const insertAuditLog = db.prepare(`
-    INSERT INTO audit_logs (id, event_type, actor, actor_role, target_type, target_id, details, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO audit_logs (id, event_type, actor, actor_role, target_type, target_id, details, created_at, prev_hash, payload_hash, chain_hash)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
+
+  const p1 = serializeAuditBlockPayload({
+    eventType: 'KNOWLEDGE_BASE_INITIALIZED',
+    actor: 'System Administrator',
+    actorRole: 'Admin',
+    targetType: 'KNOWLEDGE_BASE',
+    targetId: 'facts',
+    details: 'Acme Technologies Knowledge Base initialized with 6 approved facts and 3 brand rules.',
+    timestamp: now,
+  });
+  const p1Hash = computeSha256(p1);
+  const c1Hash = computeSha256(`${GENESIS_HASH}:${p1Hash}:${now}`);
 
   insertAuditLog.run(
     'log-init-001',
@@ -1173,8 +1268,23 @@ export function seedDemoData() {
     'KNOWLEDGE_BASE',
     'facts',
     'Acme Technologies Knowledge Base initialized with 6 approved facts and 3 brand rules.',
-    now
+    now,
+    GENESIS_HASH,
+    p1Hash,
+    c1Hash
   );
+
+  const p2 = serializeAuditBlockPayload({
+    eventType: 'TRUST_PASSPORT_ISSUED',
+    actor: 'David Miller',
+    actorRole: 'Senior Brand Compliance Officer',
+    targetType: 'TRUST_PASSPORT',
+    targetId: 'BP-PASS-2026-1011',
+    details: 'Trust Passport issued for Acme Q4 Product Launch Brochure v1. 3/3 claims verified.',
+    timestamp: now,
+  });
+  const p2Hash = computeSha256(p2);
+  const c2Hash = computeSha256(`${c1Hash}:${p2Hash}:${now}`);
 
   insertAuditLog.run(
     'log-init-002',
@@ -1184,7 +1294,10 @@ export function seedDemoData() {
     'TRUST_PASSPORT',
     'BP-PASS-2026-1011',
     'Trust Passport issued for Acme Q4 Product Launch Brochure v1. 3/3 claims verified.',
-    now
+    now,
+    c1Hash,
+    p2Hash,
+    c2Hash
   );
 
   // 5. Seed Initial Authorized Live Data Sources

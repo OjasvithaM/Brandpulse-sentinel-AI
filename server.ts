@@ -10,6 +10,7 @@ import {
   verifyPassportSignature,
   logAuditEventWithChain,
   verifyAuditLogChain,
+  serializeAuditBlockPayload,
   hashPassword,
   verifyPassword,
   createSession,
@@ -71,6 +72,11 @@ export interface AuthenticatedActor {
   isAuthenticated: boolean;
 }
 
+function formatSessionCookie(sessionId: string, maxAge = 86400): string {
+  const isProd = process.env.NODE_ENV === 'production';
+  return `bp_session=${sessionId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${isProd ? '; Secure' : ''}`;
+}
+
 function resolveActor(req: express.Request): AuthenticatedActor {
   const cookies = parseCookies(req.headers.cookie);
   const sessionToken =
@@ -90,28 +96,30 @@ function resolveActor(req: express.Request): AuthenticatedActor {
     }
   }
 
-  // Fallback to explicit role headers for backward compatibility & headless testing
-  const roleHeader = (req.headers['x-user-role'] as string)?.toUpperCase() as UserRole;
-  const validRoles: UserRole[] = ['ADMIN', 'CURATOR', 'REVIEWER', 'AUTHOR'];
-  if (roleHeader && validRoles.includes(roleHeader)) {
-    const defaultNames: Record<UserRole, string> = {
-      ADMIN: 'Sarah Jenkins (Admin)',
-      CURATOR: 'Marcus Vance (Curator)',
-      REVIEWER: 'Elena Rostova (Reviewer)',
-      AUTHOR: 'David Chen (Author)',
-    };
-    return {
-      actor: (req.headers['x-user-name'] as string) || defaultNames[roleHeader] || 'Authenticated User',
-      role: roleHeader,
-      isAuthenticated: true,
-    };
+  // Fallback to explicit role headers ONLY in non-production environments for automated headless tests
+  if (process.env.NODE_ENV !== 'production') {
+    const roleHeader = (req.headers['x-user-role'] as string)?.toUpperCase() as UserRole;
+    const validRoles: UserRole[] = ['ADMIN', 'CURATOR', 'REVIEWER', 'AUTHOR'];
+    if (roleHeader && validRoles.includes(roleHeader)) {
+      const defaultNames: Record<UserRole, string> = {
+        ADMIN: 'Sarah Jenkins (Admin)',
+        CURATOR: 'Marcus Vance (Curator)',
+        REVIEWER: 'Elena Rostova (Reviewer)',
+        AUTHOR: 'David Chen (Author)',
+      };
+      return {
+        actor: (req.headers['x-user-name'] as string) || defaultNames[roleHeader] || 'Authenticated User',
+        role: roleHeader,
+        isAuthenticated: true,
+      };
+    }
   }
 
-  // Default demo / fallback context for initial judge exploration
+  // Strict unauthenticated actor: anonymous callers have no elevated role
   return {
-    actor: 'Sarah Jenkins (Admin)',
-    role: 'ADMIN',
-    isAuthenticated: true,
+    actor: 'Anonymous',
+    role: 'AUTHOR',
+    isAuthenticated: false,
   };
 }
 
@@ -175,7 +183,24 @@ function logAuditEvent(
 // 0. AUTHENTICATION & SESSION MANAGEMENT API
 // -------------------------------------------------------------
 app.get('/api/auth/me', (req, res) => {
-  const actor = resolveActor(req);
+  let actor = resolveActor(req);
+
+  // In non-production environments, auto-initialize an Admin session if visitor has no session cookie yet
+  if (!actor.isAuthenticated && process.env.NODE_ENV !== 'production') {
+    const defaultAdmin = db.prepare("SELECT * FROM users WHERE role = 'ADMIN' LIMIT 1").get() as any;
+    if (defaultAdmin) {
+      const session = createSession(defaultAdmin.id);
+      res.setHeader('Set-Cookie', formatSessionCookie(session.id));
+      actor = {
+        id: defaultAdmin.id,
+        email: defaultAdmin.email,
+        actor: defaultAdmin.name,
+        role: defaultAdmin.role,
+        isAuthenticated: true,
+      };
+    }
+  }
+
   res.json({
     authenticated: actor.isAuthenticated,
     user: actor.isAuthenticated
@@ -201,10 +226,7 @@ app.post('/api/auth/login', (req, res) => {
   }
 
   const session = createSession(user.id);
-  res.setHeader(
-    'Set-Cookie',
-    `bp_session=${session.id}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400`
-  );
+  res.setHeader('Set-Cookie', formatSessionCookie(session.id));
 
   logAuditEvent(
     'USER_LOGIN',
@@ -233,11 +255,19 @@ app.post('/api/auth/logout', (req, res) => {
   if (sessionToken) {
     destroySession(sessionToken);
   }
-  res.setHeader('Set-Cookie', 'bp_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0');
+  res.setHeader('Set-Cookie', formatSessionCookie('', 0));
   res.json({ success: true, message: 'Logged out successfully.' });
 });
 
 app.post('/api/auth/switch-demo-user', (req, res) => {
+  // Reject role escalation in production environments
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(403).json({
+      error: 'Demo user role switching is disabled in production environments. Please authenticate with valid credentials.',
+      code: 'DEMO_SWITCHING_DISABLED',
+    });
+  }
+
   const { role } = req.body;
   const validRoles: UserRole[] = ['ADMIN', 'CURATOR', 'REVIEWER', 'AUTHOR'];
   if (!validRoles.includes(role)) {
@@ -250,10 +280,7 @@ app.post('/api/auth/switch-demo-user', (req, res) => {
   }
 
   const session = createSession(user.id);
-  res.setHeader(
-    'Set-Cookie',
-    `bp_session=${session.id}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400`
-  );
+  res.setHeader('Set-Cookie', formatSessionCookie(session.id));
 
   logAuditEvent(
     'ROLE_PERSONA_SWITCHED',
@@ -562,7 +589,7 @@ app.put('/api/facts/:id', requireRole(['CURATOR', 'ADMIN']), (req, res) => {
 });
 
 // Fact status change (mark disputed or expired)
-app.post('/api/facts/:id/status', (req, res) => {
+app.post('/api/facts/:id/status', requireRole(['CURATOR', 'ADMIN']), (req, res) => {
   try {
     const { id } = req.params;
     const { status, reason, actor } = req.body;
@@ -673,7 +700,7 @@ app.post('/api/verify', async (req, res) => {
 // -------------------------------------------------------------
 // 4. TRUST PASSPORT & ASSET ISSUE API (Step 4 & 7)
 // -------------------------------------------------------------
-app.post('/api/passports', (req, res) => {
+app.post('/api/passports', requireRole(['REVIEWER', 'ADMIN']), (req, res) => {
   try {
     const {
       asset_id,
@@ -1089,7 +1116,7 @@ app.get('/api/audits/:id', (req, res) => {
   }
 });
 
-app.post('/api/audits', async (req, res) => {
+app.post('/api/audits', requireAuth, async (req, res) => {
   try {
     const {
       audit_name,
@@ -1355,7 +1382,7 @@ app.get('/api/impacts', (req, res) => {
   }
 });
 
-app.post('/api/impacts/:id/resolve', (req, res) => {
+app.post('/api/impacts/:id/resolve', requireRole(['REVIEWER', 'ADMIN']), (req, res) => {
   try {
     const { id } = req.params;
     const { resolved_by, action } = req.body;
@@ -1698,22 +1725,39 @@ app.get('/api/audit-logs/verify-chain', (req, res) => {
 });
 
 // Non-destructive Tamper Detection Demonstration for Judges (Part 10 Demo Step 6)
-app.post('/api/audit-logs/test-tamper', (req, res) => {
+app.post('/api/audit-logs/test-tamper', requireRole(['ADMIN']), (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(403).json({
+      error: 'Tamper simulation probe is disabled in production environments.',
+      code: 'PROBE_DISABLED_IN_PROD',
+    });
+  }
+
   try {
     const testId = `test-tamper-${Date.now()}`;
     const now = new Date().toISOString();
 
-    const latestLog = db.prepare('SELECT chain_hash FROM audit_logs ORDER BY created_at DESC LIMIT 1').get() as any;
+    const latestLog = db.prepare('SELECT chain_hash FROM audit_logs WHERE chain_hash IS NOT NULL ORDER BY created_at DESC, id DESC LIMIT 1').get() as any;
     const prevHash = latestLog?.chain_hash || 'GENESIS_0000000000000000000000000000000000000000000000000000000000000000';
 
     const legitPayload = JSON.stringify({ action: 'SECURITY_INTEGRITY_TEST', time: now });
-    const legitPayloadHash = computeSha256(legitPayload);
+    const legitPayloadHash = computeSha256(
+      serializeAuditBlockPayload({
+        eventType: 'TAMPER_DEMO_TEMP',
+        actor: 'Security Evaluator',
+        actorRole: 'ADMIN',
+        targetType: 'SECURITY_PROBE',
+        targetId: 'test-block',
+        details: legitPayload,
+        timestamp: now,
+      })
+    );
     const legitChainHash = computeSha256(`${prevHash}:${legitPayloadHash}:${now}`);
 
     db.prepare(`
       INSERT INTO audit_logs (id, event_type, actor, actor_role, target_type, target_id, details, created_at, prev_hash, payload_hash, chain_hash)
       VALUES (?, 'TAMPER_DEMO_TEMP', 'Security Evaluator', 'ADMIN', 'SECURITY_PROBE', 'test-block', ?, 'FORGED_PREVIOUS_HASH_00000000', ?, ?)
-    `).run(testId, now, legitPayloadHash, legitChainHash);
+    `).run(testId, legitPayload, legitPayloadHash, legitChainHash);
 
     const tamperVerification = verifyAuditLogChain();
 
@@ -2191,129 +2235,6 @@ app.get('/api/audits/:id/replay', async (req, res) => {
   }
 });
 
-// BULK REVALIDATION: Re-evaluates all pending change impacts using EvidenceGuard
-app.post('/api/impacts/bulk-revalidate', async (req, res) => {
-  try {
-    const { actor, rationale } = req.body;
-    const actorName = actor || 'Chief Brand Officer';
-    const reasonText = rationale || 'Bulk revalidation of pending drift impacts against latest Knowledge Base.';
-
-    const pendingImpacts = db.prepare("SELECT * FROM change_impacts WHERE alert_status = 'PENDING'").all() as any[];
-    if (pendingImpacts.length === 0) {
-      return res.json({ message: 'No pending change impacts require revalidation.', processed_count: 0 });
-    }
-
-    const currentFacts = db.prepare('SELECT * FROM facts WHERE is_current = 1').all() as unknown as Fact[];
-    const brandRules = db.prepare("SELECT * FROM brand_rules WHERE status = 'active'").all() as unknown as BrandRule[];
-
-    // Group impacts by asset
-    const assetIds = Array.from(new Set(pendingImpacts.map((i) => i.asset_id)));
-    const now = new Date().toISOString();
-    let revalidatedCount = 0;
-
-    for (const assetId of assetIds) {
-      const asset = db.prepare('SELECT * FROM assets WHERE id = ?').get(assetId) as any;
-      if (!asset) continue;
-
-      const latestVersion = db.prepare(`
-        SELECT * FROM asset_versions WHERE asset_id = ? AND version = ?
-      `).get(assetId, asset.current_version) as any;
-
-      if (!latestVersion) continue;
-
-      // Run fresh EvidenceGuard verification
-      const verification = await runEvidenceGuardVerification(latestVersion.content, currentFacts, brandRules);
-      const govResult = calculateGovernanceScore(verification.findings);
-
-      // Create new version and signed Trust Passport
-      const newVersion = asset.current_version + 1;
-      db.prepare(`
-        INSERT INTO asset_versions (id, asset_id, version, content, author, created_at)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `).run(`ver-${assetId}-v${newVersion}`, assetId, newVersion, latestVersion.content, actorName, now);
-
-      db.prepare('UPDATE assets SET current_version = ?, status = ?, updated_at = ? WHERE id = ?').run(
-        newVersion,
-        govResult.status === 'PASSED' ? 'verified' : 'pending_review',
-        now,
-        assetId
-      );
-
-      // Invalidate old passport
-      db.prepare('UPDATE trust_passports SET is_latest = 0 WHERE asset_id = ?').run(assetId);
-
-      // Issue new passport
-      const passportId = `pass-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-      const passportCode = `BP-PASS-2026-${Math.floor(1000 + Math.random() * 9000)}`;
-      const claimsJson = JSON.stringify(verification.findings);
-
-      const sigResult = signPassportPayload({
-        passport_code: passportCode,
-        asset_id: assetId,
-        asset_version: newVersion,
-        governance_score: govResult.score,
-        overall_status: govResult.status,
-        claims_json: claimsJson,
-        created_at: now,
-      });
-
-      db.prepare(`
-        INSERT INTO trust_passports (
-          id, passport_code, asset_id, asset_name, asset_version, audit_run_id,
-          overall_status, governance_score, claims_json, evidence_sources_json,
-          reviewer_name, reviewer_role, human_decision, decision_rationale,
-          decision_timestamp, is_latest, created_at,
-          signature, signature_algorithm, payload_digest, signed_at
-        ) VALUES (?, ?, ?, ?, ?, 'bulk-revalidation', ?, ?, ?, '[]', ?, 'Brand Officer', 'APPROVED', ?, ?, 1, ?, ?, ?, ?, ?)
-      `).run(
-        passportId,
-        passportCode,
-        assetId,
-        asset.name,
-        newVersion,
-        govResult.status,
-        govResult.score,
-        claimsJson,
-        actorName,
-        reasonText,
-        now,
-        now,
-        sigResult.signature,
-        sigResult.signature_algorithm,
-        sigResult.payload_digest,
-        sigResult.signed_at
-      );
-
-      // Mark asset impacts as REVALIDATED
-      db.prepare(`
-        UPDATE change_impacts
-        SET alert_status = 'REVALIDATED', resolved_by = ?, resolved_at = ?
-        WHERE asset_id = ? AND alert_status = 'PENDING'
-      `).run(actorName, now, assetId);
-
-      revalidatedCount++;
-    }
-
-    logAuditEvent(
-      'BULK_REVALIDATION_EXECUTED',
-      actorName,
-      'Chief Brand Officer',
-      'CHANGE_IMPACT',
-      'BULK',
-      `Bulk revalidated ${revalidatedCount} asset(s) and resolved ${pendingImpacts.length} change impact alert(s). Rationale: ${reasonText}`
-    );
-
-    res.json({
-      success: true,
-      processed_assets: revalidatedCount,
-      resolved_impacts: pendingImpacts.length,
-      timestamp: now,
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // -------------------------------------------------------------
 // 8. LIVE DATA CONNECTORS & STAGED FACT GOVERNANCE
 // -------------------------------------------------------------
@@ -2354,7 +2275,7 @@ app.get('/api/live-sources', (req, res) => {
 });
 
 // Add custom live connector
-app.post('/api/live-sources', (req, res) => {
+app.post('/api/live-sources', requireRole(['ADMIN', 'CURATOR']), (req, res) => {
   try {
     const { name, source_type, endpoint_url, auth_type, auth_header_name, auth_token_env_var, sync_interval_mins } = req.body;
     if (!name || !endpoint_url) {
@@ -2397,7 +2318,7 @@ app.post('/api/live-sources', (req, res) => {
 });
 
 // Delete live connector
-app.delete('/api/live-sources/:id', (req, res) => {
+app.delete('/api/live-sources/:id', requireRole(['ADMIN', 'CURATOR']), (req, res) => {
   try {
     const { id } = req.params;
     db.prepare('DELETE FROM live_sources WHERE id = ?').run(id);
@@ -2416,7 +2337,7 @@ app.delete('/api/live-sources/:id', (req, res) => {
 });
 
 // Sync single live source
-app.post('/api/live-sources/:id/sync', async (req, res) => {
+app.post('/api/live-sources/:id/sync', requireRole(['ADMIN', 'CURATOR']), async (req, res) => {
   try {
     const { id } = req.params;
     const appUrl = `${req.protocol}://${req.get('host')}`;
@@ -2428,7 +2349,7 @@ app.post('/api/live-sources/:id/sync', async (req, res) => {
 });
 
 // Sync all active live sources
-app.post('/api/live-sources/sync-all', async (req, res) => {
+app.post('/api/live-sources/sync-all', requireRole(['ADMIN', 'CURATOR']), async (req, res) => {
   try {
     const sources = db.prepare('SELECT id FROM live_sources WHERE is_active = 1').all() as any[];
     const appUrl = `${req.protocol}://${req.get('host')}`;
@@ -2547,7 +2468,7 @@ app.get('/api/live-sources/staged-updates', (req, res) => {
 });
 
 // Decide (Approve / Reject) staged fact update
-app.post('/api/live-sources/staged-updates/:id/decide', (req, res) => {
+app.post('/api/live-sources/staged-updates/:id/decide', requireRole(['REVIEWER', 'ADMIN']), (req, res) => {
   try {
     const { id } = req.params;
     const { action, rationale, reviewer_name } = req.body;

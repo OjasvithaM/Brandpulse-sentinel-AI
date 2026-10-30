@@ -12,6 +12,8 @@ import { db, initDb } from '../server/db';
 import {
   verifyClaimDeterministic,
   calculateGovernanceScore,
+  detectChangeImpact,
+  ReviewedAssetSnapshot,
   Fact,
   BrandRule,
 } from '../src/utils/governance';
@@ -51,6 +53,10 @@ interface EvaluationResult {
   >;
   change_scenarios_evaluated: number;
   change_scenarios_passed: number;
+  quality_gates: {
+    passed: boolean;
+    checks: Array<{ name: string; target: string; actual: string; passed: boolean }>;
+  };
   detailed_findings: Array<{
     id: string;
     claim: string;
@@ -152,10 +158,55 @@ export function runFullEvaluation(): EvaluationResult {
     };
   }
 
-  // Change Impact Scenarios
+  // Change Impact Scenarios — Evaluated against genuine detectChangeImpact engine
   let scenariosPassed = 0;
   for (const sc of CONTROLLED_CHANGE_SCENARIOS) {
-    if (sc.expected_drift_detected) {
+    const testAssets: ReviewedAssetSnapshot[] = [
+      {
+        asset_id: `asset-${sc.id}-primary`,
+        asset_name: `Production Marketing Asset for ${sc.name}`,
+        version: 1,
+        content: `Acme product communication: ${sc.fact_name} is currently ${sc.baseline_value}. Verified by Brand Compliance.`,
+        verified_claims: [
+          {
+            claim_text: `${sc.fact_name} is ${sc.baseline_value}.`,
+            matched_fact_id: sc.fact_key,
+            matched_fact_version: 1,
+            approved_value_used: sc.baseline_value,
+          },
+        ],
+      },
+    ];
+
+    if (sc.affected_assets_count > 1) {
+      testAssets.push({
+        asset_id: `asset-${sc.id}-secondary`,
+        asset_name: `Customer Presentation Deck for ${sc.name}`,
+        version: 2,
+        content: `Acme overview presentation: ${sc.fact_name} specified as ${sc.baseline_value}.`,
+        verified_claims: [
+          {
+            claim_text: `Overview: ${sc.baseline_value}`,
+            matched_fact_id: sc.fact_key,
+            matched_fact_version: 1,
+            approved_value_used: sc.baseline_value,
+          },
+        ],
+      });
+    }
+
+    const alerts = detectChangeImpact(
+      sc.fact_key,
+      sc.fact_name,
+      1,
+      2,
+      sc.baseline_value,
+      sc.changed_value,
+      testAssets
+    );
+
+    const driftDetected = alerts.length > 0;
+    if (driftDetected === sc.expected_drift_detected && alerts.length === sc.affected_assets_count) {
       scenariosPassed++;
     }
   }
@@ -180,7 +231,16 @@ export function runFullEvaluation(): EvaluationResult {
   }
   const passportCompletenessRate = passports.length > 0 ? Math.round((completePassports / passports.length) * 1000) / 10 : 100.0;
 
-  const result: EvaluationResult = {
+  const qualityGateChecks = [
+    { name: 'Accuracy Threshold', target: '>= 75.0%', actual: `${overallAccuracy}%`, passed: overallAccuracy >= 75.0 },
+    { name: 'Macro F1 Threshold', target: '>= 0.75', actual: `${macroF1}`, passed: macroF1 >= 0.75 },
+    { name: 'Traceability Rate', target: '>= 95.0%', actual: `${traceabilityRate}%`, passed: traceabilityRate >= 95.0 },
+    { name: 'Change-Impact Recall', target: '>= 90.0%', actual: `${changeImpactRecall}%`, passed: changeImpactRecall >= 90.0 },
+    { name: 'False-Alert Ceiling', target: '<= 20.0%', actual: `${falseAlertRate}%`, passed: falseAlertRate <= 20.0 },
+  ];
+  const allGatesPassed = qualityGateChecks.every((g) => g.passed);
+
+  const result = {
     evaluation_id: `eval-${Date.now()}`,
     evaluated_at: new Date().toISOString(),
     dataset_name: DATASET_NAME,
@@ -201,6 +261,10 @@ export function runFullEvaluation(): EvaluationResult {
     class_metrics: classMetrics,
     change_scenarios_evaluated: CONTROLLED_CHANGE_SCENARIOS.length,
     change_scenarios_passed: scenariosPassed,
+    quality_gates: {
+      passed: allGatesPassed,
+      checks: qualityGateChecks,
+    },
     detailed_findings: detailedFindings,
   };
 
@@ -211,7 +275,7 @@ export function runFullEvaluation(): EvaluationResult {
   }
   fs.writeFileSync(path.join(dataDir, 'eval_results.json'), JSON.stringify(result, null, 2), 'utf-8');
 
-  return result;
+  return result as any;
 }
 
 // Execution Entrypoint
@@ -239,10 +303,22 @@ if (process.argv[1]?.endsWith('runEvaluation.ts') || process.argv[1]?.endsWith('
   console.log(`Actual UNVERIFIED:    ${evalResult.confusion_matrix.matrix[2][0].toString().padStart(12)}    ${evalResult.confusion_matrix.matrix[2][1].toString().padStart(12)}    ${evalResult.confusion_matrix.matrix[2][2].toString().padStart(12)}\n`);
 
   console.log('--- CLASS-WISE PERFORMANCE BREAKDOWN ---');
-  for (const [cls, m] of Object.entries(evalResult.class_metrics)) {
+  for (const [cls, m] of Object.entries(evalResult.class_metrics as Record<string, any>)) {
     console.log(`[${cls.padEnd(12)}] Support: ${m.support.toString().padEnd(4)} | Precision: ${m.precision.toFixed(1)}% | Recall: ${m.recall.toFixed(1)}% | F1: ${m.f1_score.toFixed(2)}`);
   }
 
+  console.log('\n--- QUALITY GATE VERIFICATION ---');
+  for (const check of evalResult.quality_gates.checks) {
+    const statusTag = check.passed ? '[PASS]' : '[FAIL]';
+    console.log(`${statusTag} ${check.name.padEnd(25)} Required: ${check.target.padEnd(10)} | Actual: ${check.actual}`);
+  }
+
   console.log('\nResults saved to: data/eval_results.json');
-  console.log('Evaluation status: PASSED benchmark quality gate.\n');
+  if (evalResult.quality_gates.passed) {
+    console.log('Evaluation status: PASSED benchmark quality gate.\n');
+    process.exit(0);
+  } else {
+    console.error('Evaluation status: FAILED benchmark quality gate.\n');
+    process.exit(1);
+  }
 }

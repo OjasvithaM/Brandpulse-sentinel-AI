@@ -1,6 +1,6 @@
 {
-  "evaluation_id": "eval-1793284351165",
-  "evaluated_at": "2026-10-29T14:32:31.165Z",
+  "evaluation_id": "eval-1793360161506",
+  "evaluated_at": "2026-10-30T11:36:01.506Z",
   "dataset_name": "BrandPulse Sentinel Governance Benchmark-154",
   "dataset_version": "v3.2.0-2026",
   "engine_version": "EvidenceGuard v3.2.0-deterministic",
@@ -67,6 +67,41 @@
   },
   "change_scenarios_evaluated": 10,
   "change_scenarios_passed": 10,
+  "quality_gates": {
+    "passed": true,
+    "checks": [
+      {
+        "name": "Accuracy Threshold",
+        "target": ">= 75.0%",
+        "actual": "79.9%",
+        "passed": true
+      },
+      {
+        "name": "Macro F1 Threshold",
+        "target": ">= 0.75",
+        "actual": "0.8",
+        "passed": true
+      },
+      {
+        "name": "Traceability Rate",
+        "target": ">= 95.0%",
+        "actual": "100%",
+        "passed": true
+      },
+      {
+        "name": "Change-Impact Recall",
+        "target": ">= 90.0%",
+        "actual": "100%",
+        "passed": true
+      },
+      {
+        "name": "False-Alert Ceiling",
+        "target": "<= 20.0%",
+        "actual": "16.7%",
+        "passed": true
+      }
+    ]
+  },
   "detailed_findings": [
     {
       "id": "tc-sup-001",

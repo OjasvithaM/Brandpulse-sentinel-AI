@@ -63,7 +63,7 @@ export interface ReviewedAssetSnapshot {
   asset_name: string;
   version: number;
   content: string;
-  passport_id: string;
+  passport_id?: string;
   verified_claims: {
     claim_text: string;
     matched_fact_id?: string | null;
